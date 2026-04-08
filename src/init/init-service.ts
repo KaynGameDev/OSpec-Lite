@@ -10,7 +10,7 @@ import {
   DocumentLanguage,
   InitResult,
   InitState,
-  OsliteConfig
+  OSpecLiteConfig
 } from "../core/types";
 import { FileRepo } from "../fs/file-repo";
 import { AgentEntryService } from "../agents/agent-entry-service";
@@ -147,7 +147,7 @@ export class InitService {
     return this.getInitState(rootDir);
   }
 
-  private createConfig(documentLanguage: DocumentLanguage): OsliteConfig {
+  private createConfig(documentLanguage: DocumentLanguage): OSpecLiteConfig {
     return {
       version: 1,
       documentLanguage,

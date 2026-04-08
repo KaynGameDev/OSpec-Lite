@@ -10,7 +10,7 @@ import { InitService } from "../init/init-service";
 import { StatusService } from "../status/status-service";
 import { ChangeService } from "../change/change-service";
 import { DocumentLanguage } from "../core/types";
-import { InitIncompleteError, OsliteError } from "../core/errors";
+import { InitIncompleteError, OSpecLiteError } from "../core/errors";
 
 const repo = new FileRepo();
 const scanService = new ScanService(repo);
@@ -99,7 +99,7 @@ async function handleChange(args: string[]): Promise<void> {
     case "new": {
       const slug = rest[0];
       if (!slug) {
-        throw new OsliteError("Missing change slug.");
+        throw new OSpecLiteError("Missing change slug.");
       }
       const targetDir = path.resolve(rest[1] ?? ".");
       const changeDir = await changeService.newChange(targetDir, slug);
@@ -125,7 +125,7 @@ async function handleChange(args: string[]): Promise<void> {
       return;
     }
     default:
-      throw new OsliteError(`Unsupported change action: ${action ?? "(missing)"}`);
+      throw new OSpecLiteError(`Unsupported change action: ${action ?? "(missing)"}`);
   }
 }
 
@@ -138,7 +138,7 @@ function readDocumentLanguageArg(args: string[]): DocumentLanguage | undefined {
   if (value === "en-US" || value === "zh-CN") {
     return value;
   }
-  throw new OsliteError(`Unsupported document language: ${value}`);
+  throw new OSpecLiteError(`Unsupported document language: ${value}`);
 }
 
 function printHelp(): void {

@@ -4,7 +4,7 @@ import { ChangeRecord, ChangeStatus } from "../core/types";
 import {
   InvalidChangeSlugError,
   NotInitializedError,
-  OsliteError
+  OSpecLiteError
 } from "../core/errors";
 import { FileRepo } from "../fs/file-repo";
 import { StatusService } from "../status/status-service";
@@ -21,7 +21,7 @@ export class ChangeService {
 
     const changeDir = path.join(rootDir, "changes", "active", slug);
     if (await this.repo.exists(changeDir)) {
-      throw new OsliteError(`Change already exists: ${slug}`);
+      throw new OSpecLiteError(`Change already exists: ${slug}`);
     }
 
     const now = new Date().toISOString();
@@ -61,7 +61,7 @@ export class ChangeService {
   async archive(changePath: string): Promise<string> {
     const record = await this.readChangeRecord(changePath);
     if (record.status !== "verified") {
-      throw new OsliteError("Only verified changes can be archived.");
+      throw new OSpecLiteError("Only verified changes can be archived.");
     }
 
     const rootDir = path.resolve(changePath, "..", "..", "..");
@@ -84,7 +84,7 @@ export class ChangeService {
   ): Promise<void> {
     const record = await this.readChangeRecord(changePath);
     if (!allowedCurrent.includes(record.status)) {
-      throw new OsliteError(
+      throw new OSpecLiteError(
         `Cannot move change from ${record.status} to ${nextStatus}.`
       );
     }
@@ -97,7 +97,7 @@ export class ChangeService {
   private async readChangeRecord(changePath: string): Promise<ChangeRecord> {
     const changeJsonPath = path.join(changePath, "change.json");
     if (!(await this.repo.exists(changeJsonPath))) {
-      throw new OsliteError(`Missing change.json: ${changePath}`);
+      throw new OSpecLiteError(`Missing change.json: ${changePath}`);
     }
     return this.repo.readJson<ChangeRecord>(changeJsonPath);
   }

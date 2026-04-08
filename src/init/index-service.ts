@@ -1,7 +1,7 @@
-import { OsliteConfig, OsliteIndex, RepositoryScanResult } from "../core/types";
+import { OSpecLiteConfig, OSpecLiteIndex, RepositoryScanResult } from "../core/types";
 
 export class IndexService {
-  buildIndex(scan: RepositoryScanResult, config: OsliteConfig): OsliteIndex {
+  buildIndex(scan: RepositoryScanResult, config: OSpecLiteConfig): OSpecLiteIndex {
     return {
       version: 1,
       generatedAt: new Date().toISOString(),

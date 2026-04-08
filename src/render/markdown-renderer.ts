@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { OsliteConfig, RepositoryScanResult, RuleItem } from "../core/types";
+import { OSpecLiteConfig, RepositoryScanResult, RuleItem } from "../core/types";
 
 export class MarkdownRenderer {
   private readonly templateCache = new Map<string, string>();
@@ -9,7 +9,7 @@ export class MarkdownRenderer {
     private readonly templateRoot = path.join(__dirname, "templates")
   ) {}
 
-  renderOverview(scan: RepositoryScanResult, config: OsliteConfig): string {
+  renderOverview(scan: RepositoryScanResult, config: OSpecLiteConfig): string {
     const areas = scan.directoryMap
       .filter((item) => item.kind === "directory")
       .slice(0, 10)
@@ -97,7 +97,7 @@ export class MarkdownRenderer {
     });
   }
 
-  renderQuickstart(scan: RepositoryScanResult, config: OsliteConfig): string {
+  renderQuickstart(scan: RepositoryScanResult, config: OSpecLiteConfig): string {
     const files = scan.importantFiles.slice(0, 6).map((filePath) => `- \`${filePath}\``);
     return this.renderTemplate("quickstart.md", {
       projectDocsRoot: config.projectDocsRoot,

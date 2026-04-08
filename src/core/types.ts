@@ -6,7 +6,7 @@ export type InitState = "uninitialized" | "initialized" | "incomplete";
 
 export type ChangeStatus = "draft" | "active" | "applied" | "verified" | "archived";
 
-export interface OsliteConfig {
+export interface OSpecLiteConfig {
   version: 1;
   documentLanguage: DocumentLanguage;
   initializedAt: string;
@@ -47,7 +47,7 @@ export interface RepositoryScanResult {
   signals: Record<string, boolean>;
 }
 
-export interface OsliteIndex {
+export interface OSpecLiteIndex {
   version: 1;
   generatedAt: string;
   project: {
@@ -92,7 +92,7 @@ export interface ChangeRecord {
 export interface StatusReport {
   state: InitState;
   missingMarkers: string[];
-  config: OsliteConfig | null;
+  config: OSpecLiteConfig | null;
   activeChanges: string[];
   archivedChanges: string[];
 }
