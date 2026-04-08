@@ -8,7 +8,7 @@
     "oslite": "dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node .\\scripts\\copy-templates.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "keywords": [

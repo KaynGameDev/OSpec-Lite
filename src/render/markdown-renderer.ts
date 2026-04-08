@@ -1,6 +1,14 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { OsliteConfig, RepositoryScanResult, RuleItem } from "../core/types";
 
 export class MarkdownRenderer {
+  private readonly templateCache = new Map<string, string>();
+
+  constructor(
+    private readonly templateRoot = path.join(__dirname, "templates")
+  ) {}
+
   renderOverview(scan: RepositoryScanResult, config: OsliteConfig): string {
     const areas = scan.directoryMap
       .filter((item) => item.kind === "directory")
@@ -13,30 +21,12 @@ export class MarkdownRenderer {
       .map(([key]) => `- ${key}`)
       .join("\n");
 
-    return `# Project Overview
-
-## Project Summary
-
-\`${scan.projectName}\` has been initialized with OSpec Lite for ${config.agentTargets.join(
-      ", "
-    )}.
-
-This document is a first-pass repository summary generated from the current filesystem structure. It is intended to help coding agents orient quickly and should be refined manually when needed.
-
-## Repo Signals
-
-${signals || "- No strong repo signals detected yet."}
-
-## Main Working Areas
-
-${areas || "- No top-level working areas detected yet."}
-
-## Needs Human Confirmation
-
-- Confirm the project summary in business terms.
-- Confirm the most important runtime entrypoints.
-- Add any repository-specific rules that agents must follow.
-`;
+    return this.renderTemplate("overview.md", {
+      projectName: scan.projectName,
+      agentTargets: config.agentTargets.join(", "),
+      repoSignals: signals || "- No strong repo signals detected yet.",
+      mainWorkingAreas: areas || "- No top-level working areas detected yet."
+    });
   }
 
   renderArchitecture(scan: RepositoryScanResult): string {
@@ -55,26 +45,10 @@ ${areas || "- No top-level working areas detected yet."}
       "Directory boundaries need human confirmation."
     );
 
-    return `# Architecture
-
-## Runtime Shape
-
-This document captures a generic, scan-based view of the repository. It should be treated as an orientation aid, not as the final source of truth.
-
-## Important Boundaries
-
-${boundaries}
-
-## Central Orchestration Points
-
-${entrypoints}
-
-## Risks And Unknowns
-
-- Scan-based entrypoint detection may miss project-specific bootstrap files.
-- Directory roles are inferred conservatively.
-- Add human-confirmed architecture notes here when they matter for implementation safety.
-`;
+    return this.renderTemplate("architecture.md", {
+      importantBoundaries: boundaries,
+      centralOrchestrationPoints: entrypoints
+    });
   }
 
   renderRepoMap(scan: RepositoryScanResult): string {
@@ -82,69 +56,28 @@ ${entrypoints}
       .map((item) => `- \`${item.path}\` (${item.kind}): ${item.role}`)
       .join("\n");
 
-    return `# Repo Map
-
-## Top-Level Directories
-
-${directoryRows || "- No top-level entries detected."}
-
-## High-Value Files
-
-${this.renderBullets(
-      scan.importantFiles.map((filePath) => `\`${filePath}\``),
-      "No high-value files detected yet."
-    )}
-
-## Where To Add New Work
-
-- Prefer existing source directories over creating new top-level areas.
-- If a new top-level area is necessary, document why in the active change plan.
-- When in doubt, inspect the highest-scoring entrypoints and nearby source folders first.
-
-## Needs Human Confirmation
-
-- Which top-level directories are primary product code versus support code.
-- Where new modules should live by default.
-- Which files are considered high-risk to edit.
-`;
+    return this.renderTemplate("repo-map.md", {
+      topLevelDirectories: directoryRows || "- No top-level entries detected.",
+      highValueFiles: this.renderBullets(
+        scan.importantFiles.map((filePath) => `\`${filePath}\``),
+        "No high-value files detected yet."
+      )
+    });
   }
 
   renderCodingRules(scan: RepositoryScanResult): string {
-    return `# Coding Rules
-
-## Hard Rules
-
-${this.renderRuleBullets(scan.rules)}
-
-## Recommended Practices
-
-- Read the active change plan before editing code.
-- Keep edits small and explain non-obvious decisions in the change files.
-- Prefer preserving existing naming and structure conventions.
-
-## Compatibility Expectations
-
-- Avoid changing public or widely shared interfaces without documenting the reason.
-- Record any migration note in \`apply.md\` when compatibility changes are unavoidable.
-
-## Documentation Expectations
-
-- Update project guidance when repo structure or conventions materially change.
-- Record checks and remaining risks in \`verify.md\`.
-`;
+    return this.renderTemplate("coding-rules.md", {
+      hardRules: this.renderRuleBullets(scan.rules)
+    });
   }
 
   renderGlossary(scan: RepositoryScanResult): string {
-    return `# Glossary
-
-## Confirmed Terms
-
-- Add human-confirmed business and technical terms here.
-
-## Candidate Terms From Scan
-
-${this.renderBullets(scan.glossarySeeds, "No candidate terms were detected yet.")}
-`;
+    return this.renderTemplate("glossary.md", {
+      candidateTerms: this.renderBullets(
+        scan.glossarySeeds,
+        "No candidate terms were detected yet."
+      )
+    });
   }
 
   renderEntrypoints(scan: RepositoryScanResult): string {
@@ -152,89 +85,28 @@ ${this.renderBullets(scan.glossarySeeds, "No candidate terms were detected yet."
       (item) => `- \`${item.path}\`: ${item.reasons.join(", ")}`
     );
 
-    return `# Entrypoints
-
-## Likely Entrypoints
-
-${this.renderBullets(
-      lines.map((line) => line.replace(/^- /, "")),
-      "No likely entrypoints detected yet."
-    )}
-
-## High-Risk Central Files
-
-${this.renderBullets(
-      scan.entrypoints.slice(0, 5).map((item) => `\`${item.path}\``),
-      "No central files detected yet."
-    )}
-
-## Notes For Safe Investigation
-
-- Start from the top-scoring files in this document.
-- Treat highly connected files as higher-risk edit points.
-- If you discover a true runtime bootstrap file, document it here.
-`;
+    return this.renderTemplate("entrypoints.md", {
+      likelyEntrypoints: this.renderBullets(
+        lines.map((line) => line.replace(/^- /, "")),
+        "No likely entrypoints detected yet."
+      ),
+      highRiskCentralFiles: this.renderBullets(
+        scan.entrypoints.slice(0, 5).map((item) => `\`${item.path}\``),
+        "No central files detected yet."
+      )
+    });
   }
 
   renderQuickstart(scan: RepositoryScanResult, config: OsliteConfig): string {
     const files = scan.importantFiles.slice(0, 6).map((filePath) => `- \`${filePath}\``);
-    return `# Quickstart
-
-## Read These First
-
-- \`AGENTS.md\`
-- \`CLAUDE.md\`
-- \`${config.projectDocsRoot}/overview.md\`
-- \`${config.projectDocsRoot}/architecture.md\`
-- \`${config.projectDocsRoot}/repo-map.md\`
-
-## How To Explore Safely
-
-${this.renderBullets(files, "Start with the project docs.")}
-
-## How To Choose Where Code Belongs
-
-- Follow existing directory conventions before creating new top-level structure.
-- Prefer local, bounded changes near the relevant entrypoint or source area.
-- Record your decision in the active change plan when placement is ambiguous.
-
-## What To Double-Check Before Editing
-
-- Relevant project rules in \`${config.projectDocsRoot}/coding-rules.md\`
-- Active change scope in \`changes/active/<change>/plan.md\`
-- Whether the target file is a high-risk central file
-`;
+    return this.renderTemplate("quickstart.md", {
+      projectDocsRoot: config.projectDocsRoot,
+      safeExploration: this.renderBullets(files, "Start with the project docs.")
+    });
   }
 
   renderChangePlaybook(): string {
-    return `# Change Playbook
-
-## Start A Change
-
-1. Create a change with \`oslite change new <slug> .\`
-2. Capture the request in \`request.md\`
-3. Write the intended approach in \`plan.md\`
-
-## Plan Before Editing
-
-- Clarify scope, affected files, and expected risks.
-- Do not start broad refactors without writing them down first.
-
-## Record Applied Work
-
-- Update \`apply.md\` with the files you changed and any deviation from plan.
-- Move the change status to \`applied\` when the implementation is complete locally.
-
-## Record Verification
-
-- Add checks, manual validation notes, and remaining risks to \`verify.md\`.
-- Move the change status to \`verified\` after validation.
-
-## Archive When Done
-
-- Archive only after the change status is \`verified\`.
-- Use \`oslite change archive <path>\` to move the change into history.
-`;
+    return this.renderTemplate("change-playbook.md", {});
   }
 
   private renderRuleBullets(rules: RuleItem[]): string {
@@ -249,5 +121,27 @@ ${this.renderBullets(files, "Start with the project docs.")}
       return `- ${fallback}`;
     }
     return items.map((item) => (item.startsWith("- ") ? item : `- ${item}`)).join("\n");
+  }
+
+  private renderTemplate(
+    templateName: string,
+    values: Record<string, string>
+  ): string {
+    const template = this.loadTemplate(templateName);
+    return template.replace(/\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g, (_match, key: string) => {
+      return values[key] ?? "";
+    });
+  }
+
+  private loadTemplate(templateName: string): string {
+    const cached = this.templateCache.get(templateName);
+    if (cached) {
+      return cached;
+    }
+
+    const templatePath = path.join(this.templateRoot, templateName);
+    const template = fs.readFileSync(templatePath, "utf8");
+    this.templateCache.set(templateName, template);
+    return template;
   }
 }
