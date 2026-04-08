@@ -2,11 +2,13 @@ import {
   CLAUDE_MANAGED_END,
   CLAUDE_MANAGED_START
 } from "../core/ospec-lite-schema";
+import { AgentTemplateService } from "./ospec-lite-agent-template-service";
 import { AgentAdapter } from "./ospec-lite-agent-target-types";
 
 export class ClaudeCodeAdapter implements AgentAdapter {
   public readonly target = "claude-code" as const;
   public readonly fileName = "CLAUDE.md";
+  private readonly templates = new AgentTemplateService();
 
   buildSection(input: {
     projectName: string;
@@ -16,19 +18,19 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     rules: string[];
     importantFiles: string[];
   }) {
-    const content = `# Claude Code Project Memory
-
-${CLAUDE_MANAGED_START}
-@AGENTS.md
-
-## Claude Code Notes
-
-- Project: ${input.projectName}
-- Summary: ${input.summary}
-- Use @${input.agentDocsRoot}/quickstart.md for quick orientation.
-- Use @${input.agentDocsRoot}/change-playbook.md for the lightweight change flow.
-${CLAUDE_MANAGED_END}
-`;
+    const content = this.templates.renderTemplate("claude.md", {
+      managedStart: CLAUDE_MANAGED_START,
+      managedEnd: CLAUDE_MANAGED_END,
+      projectName: input.projectName,
+      summary: input.summary,
+      docsRoot: input.docsRoot,
+      agentDocsRoot: input.agentDocsRoot,
+      hardRules: input.rules.map((rule) => `- ${rule}`).join("\n"),
+      highValueFiles: input.importantFiles
+        .slice(0, 5)
+        .map((filePath) => `- \`${filePath}\``)
+        .join("\n")
+    });
 
     return {
       title: "CLAUDE",

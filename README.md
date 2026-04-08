@@ -36,27 +36,33 @@ Instead of trying to solve every workflow problem up front, V1 keeps the surface
 - `.oslite/index.json`
 - minimal `change -> apply -> verify -> archive`
 
+## Install
+
+```sh
+npm install
+```
+
 ## Build
 
-```powershell
-npm.cmd install
-npm.cmd run build
+```sh
+npm run build
 ```
 
 ## Test
 
-```powershell
-npm.cmd test
+```sh
+npm test
 ```
 
 ## Usage
 
 Run from this package directory:
 
-```powershell
-node .\dist\cli\index.js init ..
-node .\dist\cli\index.js status ..
-node .\dist\cli\index.js change new example-change ..
+```sh
+node ./dist/cli/index.js init ..
+node ./dist/cli/index.js init --document-language zh-CN ..
+node ./dist/cli/index.js status ..
+node ./dist/cli/index.js change new example-change ..
 ```
 
 ## Docs

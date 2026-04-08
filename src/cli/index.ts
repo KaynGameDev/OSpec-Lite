@@ -41,8 +41,7 @@ async function main(): Promise<void> {
 }
 
 async function handleInit(args: string[]): Promise<void> {
-  const pathArg = args.find((arg) => !arg.startsWith("--")) ?? ".";
-  const documentLanguage = readDocumentLanguageArg(args);
+  const { pathArg, documentLanguage } = parseInitArgs(args);
   const targetDir = path.resolve(pathArg);
   const before = await initService.getInitState(targetDir);
 
@@ -72,7 +71,7 @@ async function handleStatus(args: string[]): Promise<void> {
   console.log(`Initialized: ${status.state === "initialized" ? "yes" : "no"}`);
   console.log(`State: ${status.state}`);
 
-  if (status.config) {
+  if (isCompleteStatusConfig(status.config)) {
     console.log(`Agent targets: ${status.config.agentTargets.join(", ")}`);
     console.log("Agent entry files:");
     for (const [target, fileName] of Object.entries(status.config.agentEntryFiles)) {
@@ -80,6 +79,8 @@ async function handleStatus(args: string[]): Promise<void> {
     }
     console.log(`Project docs: ${status.config.projectDocsRoot}`);
     console.log(`Changes root: ${status.config.changeRoot}`);
+  } else if (status.config) {
+    console.log("Config: incomplete or invalid");
   }
 
   console.log(`Active changes: ${status.activeChanges.length}`);
@@ -129,16 +130,85 @@ async function handleChange(args: string[]): Promise<void> {
   }
 }
 
-function readDocumentLanguageArg(args: string[]): DocumentLanguage | undefined {
-  const flagIndex = args.findIndex((arg) => arg === "--document-language");
-  if (flagIndex < 0) {
-    return undefined;
+function parseInitArgs(args: string[]): {
+  pathArg: string;
+  documentLanguage?: DocumentLanguage;
+} {
+  let pathArg: string | undefined;
+  let documentLanguage: DocumentLanguage | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === "--document-language") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new OSpecLiteError("Missing value for --document-language.");
+      }
+      documentLanguage = parseDocumentLanguage(value);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--document-language=")) {
+      documentLanguage = parseDocumentLanguage(
+        arg.slice("--document-language=".length)
+      );
+      continue;
+    }
+
+    if (arg.startsWith("--")) {
+      throw new OSpecLiteError(`Unsupported option: ${arg}`);
+    }
+
+    if (pathArg) {
+      throw new OSpecLiteError(`Unexpected argument: ${arg}`);
+    }
+
+    pathArg = arg;
   }
-  const value = args[flagIndex + 1];
+
+  return {
+    pathArg: pathArg ?? ".",
+    documentLanguage
+  };
+}
+
+function parseDocumentLanguage(value: string): DocumentLanguage {
   if (value === "en-US" || value === "zh-CN") {
     return value;
   }
   throw new OSpecLiteError(`Unsupported document language: ${value}`);
+}
+
+function isCompleteStatusConfig(
+  value: unknown
+): value is {
+  agentTargets: string[];
+  agentEntryFiles: Record<string, string>;
+  projectDocsRoot: string;
+  changeRoot: string;
+} {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as {
+    agentTargets?: unknown;
+    agentEntryFiles?: unknown;
+    projectDocsRoot?: unknown;
+    changeRoot?: unknown;
+  };
+
+  return (
+    Array.isArray(candidate.agentTargets) &&
+    candidate.agentTargets.every((item) => typeof item === "string") &&
+    !!candidate.agentEntryFiles &&
+    typeof candidate.agentEntryFiles === "object" &&
+    Object.values(candidate.agentEntryFiles).every((item) => typeof item === "string") &&
+    typeof candidate.projectDocsRoot === "string" &&
+    typeof candidate.changeRoot === "string"
+  );
 }
 
 function printHelp(): void {

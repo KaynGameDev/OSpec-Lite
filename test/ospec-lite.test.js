@@ -97,6 +97,93 @@ test("cli init fails clearly when initialization is incomplete", async (t) => {
   assert.match(result.stderr, /\.oslite\/index\.json/i);
 });
 
+test("cli prints help when no command is provided", () => {
+  const result = runCli([]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^oslite <command>/m);
+  assert.match(result.stdout, /oslite status \[path]/);
+  assert.equal(result.stderr, "");
+});
+
+test("cli init accepts document language flags before the path", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-flag-order-");
+  await seedRepo(rootDir);
+
+  const result = runCli(["init", "--document-language", "zh-CN", rootDir]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /repository initialized/i);
+
+  const config = await fs.readFile(
+    path.join(rootDir, ".oslite", "config.json"),
+    "utf8"
+  );
+  assert.match(config, /"documentLanguage": "zh-CN"/);
+});
+
+test("cli init rejects unsupported document language values", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-invalid-language-");
+  await seedRepo(rootDir);
+
+  const result = runCli(["init", "--document-language", "fr-FR", rootDir]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unsupported document language: fr-FR/i);
+});
+
+test("cli change rejects unsupported actions", () => {
+  const result = runCli(["change", "explode"]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unsupported change action: explode/i);
+});
+
+test("cli status reports uninitialized repositories", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-status-uninitialized-");
+  await seedRepo(rootDir);
+
+  const result = runCli(["status", rootDir]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /OSpec Lite Status/);
+  assert.match(result.stdout, /Initialized: no/);
+  assert.match(result.stdout, /State: uninitialized/);
+  assert.match(result.stdout, /Active changes: 0/);
+  assert.match(result.stdout, /Archived changes: 0/);
+  assert.doesNotMatch(result.stdout, /Agent targets:/);
+});
+
+test("cli status reports incomplete repositories without crashing", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-status-incomplete-");
+  await fs.mkdir(path.join(rootDir, ".oslite"), { recursive: true });
+  await fs.writeFile(path.join(rootDir, ".oslite", "config.json"), "{}\n", "utf8");
+
+  const result = runCli(["status", rootDir]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Initialized: no/);
+  assert.match(result.stdout, /State: incomplete/);
+  assert.match(result.stdout, /Config: incomplete or invalid/);
+  assert.match(result.stdout, /Missing markers:/);
+  assert.match(result.stdout, /\.oslite\/index\.json/);
+});
+
+test("cli status reports initialized repositories with config details", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-status-initialized-");
+  await seedRepo(rootDir);
+
+  const { initService, changeService } = createServices();
+  await initService.init(rootDir, "en-US");
+  await changeService.newChange(rootDir, "status-check");
+
+  const result = runCli(["status", rootDir]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Initialized: yes/);
+  assert.match(result.stdout, /State: initialized/);
+  assert.match(result.stdout, /Agent targets: codex, claude-code/);
+  assert.match(result.stdout, /Project docs: docs\/project/);
+  assert.match(result.stdout, /Changes root: changes/);
+  assert.match(result.stdout, /Active changes: 1/);
+  assert.match(result.stdout, /Archived changes: 0/);
+});
+
 test("change workflow advances from draft through archive", async (t) => {
   const rootDir = await createTempRepo(t, "ospec-lite-change-");
   await seedRepo(rootDir);
@@ -139,6 +226,23 @@ test("change workflow advances from draft through archive", async (t) => {
   const status = await statusService.getStatus(rootDir);
   assert.equal(status.activeChanges.length, 0);
   assert.deepEqual(status.archivedChanges, ["add-tests"]);
+});
+
+test("init captures common repo signals from lowercase working directories", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-signals-");
+  await seedRepo(rootDir);
+  await fs.mkdir(path.join(rootDir, "test"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "scripts"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "assets"), { recursive: true });
+
+  const { repo, initService } = createServices();
+  await initService.init(rootDir, "en-US");
+
+  const index = await repo.readJson(path.join(rootDir, ".oslite", "index.json"));
+  assert.equal(index.signals.hasSrcDir, true);
+  assert.equal(index.signals.hasTestsDir, true);
+  assert.equal(index.signals.hasScriptDir, true);
+  assert.equal(index.signals.hasAssetsDir, true);
 });
 
 test("init patches existing AGENTS.md and CLAUDE.md without removing human content", async (t) => {
@@ -241,6 +345,19 @@ test("agent entry patching replaces managed sections instead of duplicating them
     rules: ["Use the managed CLAUDE block."],
     importantFiles: ["CLAUDE.md", "docs/project/overview.md"]
   });
+
+  assert.match(codexSection.content, /^# Agent Guide/m);
+  assert.match(codexSection.content, new RegExp(escapeRegex(AGENTS_MANAGED_START)));
+  assert.match(codexSection.content, /Updated summary for AGENTS\./);
+  assert.match(codexSection.content, /Use the managed AGENTS block\./);
+  assert.match(codexSection.content, /- `AGENTS\.md`/);
+  assert.match(codexSection.content, /- `docs\/project\/overview\.md`/);
+
+  assert.match(claudeSection.content, /^# Claude Code Project Memory/m);
+  assert.match(claudeSection.content, new RegExp(escapeRegex(CLAUDE_MANAGED_START)));
+  assert.match(claudeSection.content, /@AGENTS\.md/);
+  assert.match(claudeSection.content, /Updated summary for CLAUDE\./);
+  assert.match(claudeSection.content, /Use @docs\/agents\/quickstart\.md for quick orientation\./);
 
   await agentEntries.ensureManagedSection(
     rootDir,
@@ -422,4 +539,8 @@ function runCli(args) {
 
 function countOccurrences(content, token) {
   return content.split(token).length - 1;
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

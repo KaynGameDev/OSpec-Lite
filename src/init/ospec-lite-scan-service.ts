@@ -90,17 +90,17 @@ export class ScanService {
     rootDir: string,
     topLevelNames: string[]
   ): Promise<Record<string, boolean>> {
-    const topLevel = new Set(topLevelNames);
+    const topLevel = new Set(topLevelNames.map((name) => name.toLowerCase()));
     return {
       hasGit: await this.repo.exists(path.join(rootDir, ".git")),
       hasPackageJson: topLevel.has("package.json"),
-      hasReadme: topLevel.has("README.md"),
+      hasReadme: topLevel.has("readme.md"),
       hasDocsDir: topLevel.has("docs"),
       hasSrcDir: topLevel.has("src"),
-      hasTestsDir: topLevel.has("tests"),
-      hasScriptDir: topLevel.has("Script"),
-      hasAssetsDir: topLevel.has("Assets"),
-      hasUnityProjectSettings: topLevel.has("ProjectSettings")
+      hasTestsDir: topLevel.has("tests") || topLevel.has("test"),
+      hasScriptDir: topLevel.has("script") || topLevel.has("scripts"),
+      hasAssetsDir: topLevel.has("assets"),
+      hasUnityProjectSettings: topLevel.has("projectsettings")
     };
   }
 
