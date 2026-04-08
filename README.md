@@ -43,6 +43,12 @@ npm.cmd install
 npm.cmd run build
 ```
 
+## Test
+
+```powershell
+npm.cmd test
+```
+
 ## Usage
 
 Run from this package directory:
