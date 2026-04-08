@@ -30,6 +30,11 @@ export class InitService {
   ) {}
 
   async getInitState(rootDir: string): Promise<InitResult> {
+    const configPath = path.join(rootDir, OSPEC_LITE_DIR, "config.json");
+    const indexPath = path.join(rootDir, OSPEC_LITE_DIR, "index.json");
+    const hasBootstrapArtifacts =
+      (await this.repo.exists(configPath)) || (await this.repo.exists(indexPath));
+
     const missingMarkers: string[] = [];
     for (const marker of INIT_MARKERS) {
       if (!(await this.repo.exists(path.join(rootDir, marker)))) {
@@ -37,10 +42,8 @@ export class InitService {
       }
     }
 
-    const configPath = path.join(rootDir, OSPEC_LITE_DIR, "config.json");
-    const indexPath = path.join(rootDir, OSPEC_LITE_DIR, "index.json");
     const state: InitState =
-      missingMarkers.length === INIT_MARKERS.length
+      !hasBootstrapArtifacts
         ? "uninitialized"
         : missingMarkers.length === 0
           ? "initialized"

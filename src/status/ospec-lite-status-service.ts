@@ -7,6 +7,11 @@ export class StatusService {
   constructor(private readonly repo: FileRepo) {}
 
   async getStatus(rootDir: string): Promise<StatusReport> {
+    const configPath = path.join(rootDir, OSPEC_LITE_DIR, "config.json");
+    const indexPath = path.join(rootDir, OSPEC_LITE_DIR, "index.json");
+    const hasBootstrapArtifacts =
+      (await this.repo.exists(configPath)) || (await this.repo.exists(indexPath));
+
     const missingMarkers: string[] = [];
     for (const marker of INIT_MARKERS) {
       if (!(await this.repo.exists(path.join(rootDir, marker)))) {
@@ -15,13 +20,12 @@ export class StatusService {
     }
 
     const state =
-      missingMarkers.length === INIT_MARKERS.length
+      !hasBootstrapArtifacts
         ? "uninitialized"
         : missingMarkers.length === 0
           ? "initialized"
           : "incomplete";
 
-    const configPath = path.join(rootDir, OSPEC_LITE_DIR, "config.json");
     const config =
       state !== "uninitialized" && (await this.repo.exists(configPath))
         ? await this.repo.readJson<OSpecLiteConfig>(configPath)

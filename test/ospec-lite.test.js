@@ -9,12 +9,16 @@ const { FileRepo } = require("../dist/fs/file-repo.js");
 const { ScanService } = require("../dist/init/ospec-lite-scan-service.js");
 const { MarkdownRenderer } = require("../dist/render/ospec-lite-markdown-renderer.js");
 const { AgentEntryService } = require("../dist/agents/ospec-lite-agent-entry-service.js");
+const { CodexAdapter } = require("../dist/agents/ospec-lite-codex-adapter.js");
+const { ClaudeCodeAdapter } = require("../dist/agents/ospec-lite-claude-code-adapter.js");
 const { IndexService } = require("../dist/init/ospec-lite-index-service.js");
 const { InitService } = require("../dist/init/ospec-lite-init-service.js");
 const { StatusService } = require("../dist/status/ospec-lite-status-service.js");
 const { ChangeService } = require("../dist/change/ospec-lite-change-service.js");
 const {
+  AGENTS_MANAGED_END,
   AGENTS_MANAGED_START,
+  CLAUDE_MANAGED_END,
   CLAUDE_MANAGED_START,
   INIT_MARKERS
 } = require("../dist/core/ospec-lite-schema.js");
@@ -122,6 +126,137 @@ test("change workflow advances from draft through archive", async (t) => {
   const status = await statusService.getStatus(rootDir);
   assert.equal(status.activeChanges.length, 0);
   assert.deepEqual(status.archivedChanges, ["add-tests"]);
+});
+
+test("init patches existing AGENTS.md and CLAUDE.md without removing human content", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-agent-patch-");
+  await seedRepo(rootDir);
+
+  const originalAgents = [
+    "# Team Notes",
+    "",
+    "Keep this introduction.",
+    "",
+    "## Local Guidance",
+    "",
+    "- Human-authored AGENTS note.",
+    ""
+  ].join("\n");
+  const originalClaude = [
+    "# Claude Notes",
+    "",
+    "Keep this preface.",
+    "",
+    "## Local Memory",
+    "",
+    "- Human-authored CLAUDE note.",
+    ""
+  ].join("\n");
+
+  await fs.writeFile(path.join(rootDir, "AGENTS.md"), originalAgents, "utf8");
+  await fs.writeFile(path.join(rootDir, "CLAUDE.md"), originalClaude, "utf8");
+
+  const { initService } = createServices();
+  await initService.init(rootDir, "en-US");
+
+  const agents = await fs.readFile(path.join(rootDir, "AGENTS.md"), "utf8");
+  const claude = await fs.readFile(path.join(rootDir, "CLAUDE.md"), "utf8");
+
+  assert.match(agents, /Keep this introduction\./);
+  assert.match(claude, /Keep this preface\./);
+  assert.equal(countOccurrences(agents, AGENTS_MANAGED_START), 1);
+  assert.equal(countOccurrences(claude, CLAUDE_MANAGED_START), 1);
+  assert.match(agents, /## OSpec Lite/);
+  assert.match(claude, /@AGENTS\.md/);
+});
+
+test("agent entry patching replaces managed sections instead of duplicating them", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-managed-update-");
+  await seedRepo(rootDir);
+
+  const repo = new FileRepo();
+  const agentEntries = new AgentEntryService(repo);
+  const codexAdapter = new CodexAdapter();
+  const claudeAdapter = new ClaudeCodeAdapter();
+
+  await fs.writeFile(
+    path.join(rootDir, "AGENTS.md"),
+    [
+      "# Team Notes",
+      "",
+      "Intro stays.",
+      "",
+      AGENTS_MANAGED_START,
+      "Old AGENTS managed content",
+      AGENTS_MANAGED_END,
+      "",
+      "Tail stays.",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  await fs.writeFile(
+    path.join(rootDir, "CLAUDE.md"),
+    [
+      "# Claude Notes",
+      "",
+      "Prelude stays.",
+      "",
+      CLAUDE_MANAGED_START,
+      "Old CLAUDE managed content",
+      CLAUDE_MANAGED_END,
+      "",
+      "Footer stays.",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+
+  const codexSection = codexAdapter.buildSection({
+    projectName: "Managed Update Repo",
+    summary: "Updated summary for AGENTS.",
+    docsRoot: "docs/project",
+    agentDocsRoot: "docs/agents",
+    rules: ["Use the managed AGENTS block."],
+    importantFiles: ["AGENTS.md", "docs/project/overview.md"]
+  });
+  const claudeSection = claudeAdapter.buildSection({
+    projectName: "Managed Update Repo",
+    summary: "Updated summary for CLAUDE.",
+    docsRoot: "docs/project",
+    agentDocsRoot: "docs/agents",
+    rules: ["Use the managed CLAUDE block."],
+    importantFiles: ["CLAUDE.md", "docs/project/overview.md"]
+  });
+
+  await agentEntries.ensureManagedSection(
+    rootDir,
+    codexAdapter,
+    codexSection.content,
+    codexSection.managedStart,
+    codexSection.managedEnd
+  );
+  await agentEntries.ensureManagedSection(
+    rootDir,
+    claudeAdapter,
+    claudeSection.content,
+    claudeSection.managedStart,
+    claudeSection.managedEnd
+  );
+
+  const agents = await fs.readFile(path.join(rootDir, "AGENTS.md"), "utf8");
+  const claude = await fs.readFile(path.join(rootDir, "CLAUDE.md"), "utf8");
+
+  assert.equal(countOccurrences(agents, AGENTS_MANAGED_START), 1);
+  assert.equal(countOccurrences(claude, CLAUDE_MANAGED_START), 1);
+  assert.doesNotMatch(agents, /Old AGENTS managed content/);
+  assert.doesNotMatch(claude, /Old CLAUDE managed content/);
+  assert.match(agents, /Intro stays\./);
+  assert.match(agents, /Tail stays\./);
+  assert.match(claude, /Prelude stays\./);
+  assert.match(claude, /Footer stays\./);
+  assert.match(agents, /Updated summary for AGENTS\./);
+  assert.match(claude, /Updated summary for CLAUDE\./);
 });
 
 test("newChange rejects invalid change slugs", async (t) => {
@@ -270,4 +405,8 @@ function runCli(args) {
   return spawnSync(process.execPath, [CLI_PATH, ...args], {
     encoding: "utf8"
   });
+}
+
+function countOccurrences(content, token) {
+  return content.split(token).length - 1;
 }
