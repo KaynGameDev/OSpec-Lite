@@ -18,6 +18,10 @@ const {
   CLAUDE_MANAGED_START,
   INIT_MARKERS
 } = require("../dist/core/ospec-lite-schema.js");
+const {
+  InvalidChangeSlugError,
+  OSpecLiteError
+} = require("../dist/core/ospec-lite-errors.js");
 
 const CLI_PATH = path.resolve(__dirname, "../dist/cli/index.js");
 
@@ -118,6 +122,87 @@ test("change workflow advances from draft through archive", async (t) => {
   const status = await statusService.getStatus(rootDir);
   assert.equal(status.activeChanges.length, 0);
   assert.deepEqual(status.archivedChanges, ["add-tests"]);
+});
+
+test("newChange rejects invalid change slugs", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-invalid-slug-");
+  await seedRepo(rootDir);
+
+  const { initService, changeService } = createServices();
+  await initService.init(rootDir, "en-US");
+
+  await assert.rejects(
+    () => changeService.newChange(rootDir, "Invalid_Slug"),
+    (error) => {
+      assert.ok(error instanceof InvalidChangeSlugError);
+      assert.match(error.message, /invalid change slug/i);
+      return true;
+    }
+  );
+});
+
+test("newChange rejects duplicate slugs", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-duplicate-slug-");
+  await seedRepo(rootDir);
+
+  const { initService, changeService } = createServices();
+  await initService.init(rootDir, "en-US");
+
+  await changeService.newChange(rootDir, "duplicate-change");
+
+  await assert.rejects(
+    () => changeService.newChange(rootDir, "duplicate-change"),
+    (error) => {
+      assert.ok(error instanceof OSpecLiteError);
+      assert.match(error.message, /change already exists/i);
+      return true;
+    }
+  );
+});
+
+test("markVerified rejects a draft change", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-invalid-verify-");
+  await seedRepo(rootDir);
+
+  const { repo, initService, changeService } = createServices();
+  await initService.init(rootDir, "en-US");
+
+  const changeDir = await changeService.newChange(rootDir, "invalid-verify");
+
+  await assert.rejects(
+    () => changeService.markVerified(changeDir),
+    (error) => {
+      assert.ok(error instanceof OSpecLiteError);
+      assert.match(error.message, /cannot move change from draft to verified/i);
+      return true;
+    }
+  );
+
+  const record = await repo.readJson(path.join(changeDir, "change.json"));
+  assert.equal(record.status, "draft");
+});
+
+test("archive rejects changes that are not verified", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-invalid-archive-");
+  await seedRepo(rootDir);
+
+  const { repo, initService, changeService } = createServices();
+  await initService.init(rootDir, "en-US");
+
+  const changeDir = await changeService.newChange(rootDir, "invalid-archive");
+
+  await assert.rejects(
+    () => changeService.archive(changeDir),
+    (error) => {
+      assert.ok(error instanceof OSpecLiteError);
+      assert.match(error.message, /only verified changes can be archived/i);
+      return true;
+    }
+  );
+
+  const record = await repo.readJson(path.join(changeDir, "change.json"));
+  assert.equal(record.status, "draft");
+  assert.equal(await repo.exists(changeDir), true);
 });
 
 function createServices() {
