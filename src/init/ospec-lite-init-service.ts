@@ -12,11 +12,16 @@ import {
   OSPEC_LITE_DIR
 } from "../core/ospec-lite-schema";
 import {
+  BootstrapAgent,
   DocumentLanguage,
+  HostAgent,
+  InitBootstrapPlan,
+  InitOptions,
   InitResult,
   InitState,
   LoadedOSpecLiteProfile,
   OSpecLiteConfig,
+  ProfileTemplateValues,
   RepositoryScanResult
 } from "../core/ospec-lite-types";
 import { FileRepo } from "../fs/file-repo";
@@ -30,6 +35,11 @@ import { ProfileLoader } from "../profile/ospec-lite-profile-loader";
 import { ProfilePreconditionError } from "../core/ospec-lite-errors";
 
 export class InitService {
+  private static readonly bootstrapCommands: Record<Exclude<BootstrapAgent, "none">, string> = {
+    codex: "Use $oslite-fill-project-docs to fill the project docs for this repo.",
+    "claude-code": "/oslite-fill-project-docs"
+  };
+
   constructor(
     private readonly repo: FileRepo,
     private readonly scanner: ScanService,
@@ -50,7 +60,10 @@ export class InitService {
         : null;
 
     const missingMarkers: string[] = [];
-    for (const marker of this.getExpectedMarkers(config?.authoringPackRoot)) {
+    for (const marker of this.getExpectedMarkers(
+      config?.authoringPackRoot,
+      config?.profileOutputs
+    )) {
       if (!(await this.repo.exists(path.join(rootDir, marker)))) {
         missingMarkers.push(marker);
       }
@@ -67,28 +80,31 @@ export class InitService {
       state,
       configPath,
       indexPath,
-      missingMarkers
+      missingMarkers,
+      config
     };
   }
 
-  async init(
-    rootDir: string,
-    documentLanguage?: DocumentLanguage,
-    profileId?: string
-  ): Promise<InitResult> {
+  async init(rootDir: string, options: InitOptions = {}): Promise<InitResult> {
     const initState = await this.getInitState(rootDir);
     if (initState.state !== "uninitialized") {
       return initState;
     }
 
-    const profile = profileId ? await this.profiles.loadProfile(profileId) : null;
+    const profile = options.profileId ? await this.profiles.loadProfile(options.profileId) : null;
     if (profile) {
       await this.ensureProfileRequirements(rootDir, profile);
     }
     const language =
-      documentLanguage ?? profile?.documentLanguage ?? DEFAULT_DOCUMENT_LANGUAGE;
-    const config = this.createConfig(language, profile);
+      options.documentLanguage ?? profile?.documentLanguage ?? DEFAULT_DOCUMENT_LANGUAGE;
     const scan = await this.scanner.scan(rootDir);
+    const projectName = options.projectName?.trim() || scan.projectName;
+    const config = this.createConfig(
+      language,
+      profile,
+      profile ? projectName : undefined,
+      profile ? options.bootstrapAgent : undefined
+    );
     const summary = this.buildSummary(scan);
 
     await this.repo.ensureDir(path.join(rootDir, OSPEC_LITE_DIR));
@@ -108,8 +124,10 @@ export class InitService {
 
     if (profile) {
       await this.applyProfileAssets(rootDir, profile, {
-        projectName: scan.projectName,
+        projectName,
         summary,
+        documentLanguage: config.documentLanguage,
+        bootstrapAgent: config.bootstrapAgent ?? "none",
         docsRoot: config.projectDocsRoot,
         agentDocsRoot: config.agentDocsRoot,
         authoringPackRoot: config.authoringPackRoot ?? "",
@@ -121,12 +139,17 @@ export class InitService {
       await this.writeGenericKnowledgeLayer(rootDir, scan, config, summary);
     }
 
-    return this.getInitState(rootDir);
+    const result = await this.getInitState(rootDir);
+    result.config = config;
+    result.bootstrapPlan = this.buildBootstrapPlan(config, options.hostAgent ?? "unknown");
+    return result;
   }
 
   private createConfig(
     documentLanguage: DocumentLanguage,
-    profile: LoadedOSpecLiteProfile | null
+    profile: LoadedOSpecLiteProfile | null,
+    projectName?: string,
+    bootstrapAgent?: BootstrapAgent
   ): OSpecLiteConfig {
     return {
       version: 1,
@@ -137,12 +160,16 @@ export class InitService {
         codex: AGENTS_FILE,
         "claude-code": CLAUDE_FILE
       },
+      agentWrapperFiles: profile?.agentWrapperFiles,
+      projectName,
+      bootstrapAgent,
       projectDocsRoot: "docs/project",
       agentDocsRoot: "docs/agents",
       changeRoot: "changes",
       archiveLayout: "date-slug",
       profileId: profile?.id,
-      authoringPackRoot: profile?.authoringPackRoot
+      authoringPackRoot: profile?.authoringPackRoot,
+      profileOutputs: profile?.outputs
     };
   }
 
@@ -173,17 +200,20 @@ export class InitService {
     }
   }
 
-  private getExpectedMarkers(authoringPackRoot?: string): string[] {
-    if (!authoringPackRoot) {
-      return [...INIT_MARKERS];
+  private getExpectedMarkers(authoringPackRoot?: string, profileOutputs?: string[]): string[] {
+    const markers = new Set<string>(INIT_MARKERS);
+
+    if (authoringPackRoot) {
+      for (const fileName of AUTHORING_PACK_FILES) {
+        markers.add(path.join(authoringPackRoot, fileName).replace(/\\/g, "/"));
+      }
     }
 
-    return [
-      ...INIT_MARKERS,
-      ...AUTHORING_PACK_FILES.map((fileName) =>
-        path.join(authoringPackRoot, fileName).replace(/\\/g, "/")
-      )
-    ];
+    for (const output of profileOutputs ?? []) {
+      markers.add(output);
+    }
+
+    return [...markers];
   }
 
   private async writeGenericKnowledgeLayer(
@@ -263,16 +293,7 @@ export class InitService {
   private async applyProfileAssets(
     rootDir: string,
     profile: LoadedOSpecLiteProfile,
-    values: {
-      projectName: string;
-      summary: string;
-      docsRoot: string;
-      agentDocsRoot: string;
-      authoringPackRoot: string;
-      profileId: string;
-      managedStart: string;
-      managedEnd: string;
-    }
+    values: ProfileTemplateValues
   ): Promise<void> {
     for (const asset of profile.assets) {
       switch (asset.mode) {
@@ -331,5 +352,33 @@ export class InitService {
     if (missingPaths.length > 0) {
       throw new ProfilePreconditionError(profile.id, missingPaths);
     }
+  }
+
+  private buildBootstrapPlan(
+    config: OSpecLiteConfig,
+    hostAgent: HostAgent
+  ): InitBootstrapPlan | null {
+    const bootstrapAgent = config.bootstrapAgent;
+    if (!bootstrapAgent) {
+      return null;
+    }
+
+    if (bootstrapAgent === "none") {
+      return {
+        bootstrapAgent,
+        hostAgent,
+        shouldBootstrapNow: false,
+        nextStep: "No bootstrap step configured."
+      };
+    }
+
+    const wrapperPath = config.agentWrapperFiles?.[bootstrapAgent]?.[0];
+    return {
+      bootstrapAgent,
+      hostAgent,
+      wrapperPath,
+      shouldBootstrapNow: hostAgent === bootstrapAgent,
+      nextStep: InitService.bootstrapCommands[bootstrapAgent]
+    };
   }
 }

@@ -67,6 +67,18 @@ export class ProfileLoader {
         `Profile ${profile.id} has invalid requiredRepoPaths declarations.`
       );
     }
+    if (
+      profile.agentWrapperFiles &&
+      !Object.values(profile.agentWrapperFiles).every(
+        (files) =>
+          Array.isArray(files) &&
+          files.every((filePath) => typeof filePath === "string" && filePath.length > 0)
+      )
+    ) {
+      throw new InvalidProfileError(
+        `Profile ${profile.id} has invalid agentWrapperFiles declarations.`
+      );
+    }
 
     for (const asset of profile.assets) {
       if (!asset.source || !asset.target) {

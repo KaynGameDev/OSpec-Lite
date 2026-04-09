@@ -35,7 +35,7 @@ test("init bootstraps the repository knowledge layer", async (t) => {
   await seedRepo(rootDir);
 
   const { repo, initService, statusService } = createServices();
-  const result = await initService.init(rootDir, "zh-CN");
+  const result = await initService.init(rootDir, { documentLanguage: "zh-CN" });
 
   assert.equal(result.state, "initialized");
 
@@ -179,7 +179,7 @@ test("cli status reports initialized repositories with config details", async (t
   await seedRepo(rootDir);
 
   const { initService, changeService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
   await changeService.newChange(rootDir, "status-check");
 
   const result = runCli(["status", rootDir]);
@@ -198,7 +198,7 @@ test("change workflow advances from draft through archive", async (t) => {
   await seedRepo(rootDir);
 
   const { repo, initService, statusService, changeService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
 
   const changeDir = await changeService.newChange(rootDir, "add-tests");
   const request = await repo.readText(path.join(changeDir, "request.md"));
@@ -245,7 +245,7 @@ test("init captures common repo signals from lowercase working directories", asy
   await fs.mkdir(path.join(rootDir, "assets"), { recursive: true });
 
   const { repo, initService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
 
   const index = await repo.readJson(path.join(rootDir, ".oslite", "index.json"));
   assert.equal(index.signals.hasSrcDir, true);
@@ -283,7 +283,7 @@ test("init patches existing AGENTS.md and CLAUDE.md without removing human conte
   await fs.writeFile(path.join(rootDir, "CLAUDE.md"), originalClaude, "utf8");
 
   const { initService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
 
   const agents = await fs.readFile(path.join(rootDir, "AGENTS.md"), "utf8");
   const claude = await fs.readFile(path.join(rootDir, "CLAUDE.md"), "utf8");
@@ -405,7 +405,7 @@ test("newChange rejects invalid change slugs", async (t) => {
   await seedRepo(rootDir);
 
   const { initService, changeService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
 
   await assert.rejects(
     () => changeService.newChange(rootDir, "Invalid_Slug"),
@@ -422,7 +422,7 @@ test("newChange rejects duplicate slugs", async (t) => {
   await seedRepo(rootDir);
 
   const { initService, changeService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
 
   await changeService.newChange(rootDir, "duplicate-change");
 
@@ -441,7 +441,7 @@ test("markVerified rejects a draft change", async (t) => {
   await seedRepo(rootDir);
 
   const { repo, initService, changeService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
 
   const changeDir = await changeService.newChange(rootDir, "invalid-verify");
 
@@ -463,7 +463,7 @@ test("archive rejects changes that are not verified", async (t) => {
   await seedRepo(rootDir);
 
   const { repo, initService, changeService } = createServices();
-  await initService.init(rootDir, "en-US");
+  await initService.init(rootDir, { documentLanguage: "en-US" });
 
   const changeDir = await changeService.newChange(rootDir, "invalid-archive");
 

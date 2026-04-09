@@ -10,7 +10,7 @@ export class IndexService {
       version: 1,
       generatedAt: new Date().toISOString(),
       project: {
-        name: scan.projectName,
+        name: config.projectName ?? scan.projectName,
         documentLanguage: config.documentLanguage
       },
       agentTargets: [...config.agentTargets],

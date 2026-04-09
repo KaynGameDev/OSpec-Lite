@@ -1,6 +1,8 @@
 export type DocumentLanguage = "en-US" | "zh-CN";
 
 export type AgentTarget = "codex" | "claude-code";
+export type BootstrapAgent = AgentTarget | "none";
+export type HostAgent = AgentTarget | "unknown";
 
 export type InitState = "uninitialized" | "initialized" | "incomplete";
 
@@ -17,12 +19,16 @@ export interface OSpecLiteConfig {
   initializedAt: string;
   agentTargets: AgentTarget[];
   agentEntryFiles: Record<AgentTarget, string>;
+  agentWrapperFiles?: Partial<Record<AgentTarget, string[]>>;
+  projectName?: string;
+  bootstrapAgent?: BootstrapAgent;
   projectDocsRoot: string;
   agentDocsRoot: string;
   changeRoot: string;
   archiveLayout: "date-slug";
   profileId?: string;
   authoringPackRoot?: string;
+  profileOutputs?: string[];
 }
 
 export interface RuleItem {
@@ -79,6 +85,8 @@ export interface InitResult {
   configPath: string;
   indexPath: string;
   missingMarkers: string[];
+  config?: OSpecLiteConfig | null;
+  bootstrapPlan?: InitBootstrapPlan | null;
 }
 
 export interface ChangeRecord {
@@ -120,6 +128,7 @@ export interface OSpecLiteProfile {
   outputs: string[];
   assets: OSpecLiteProfileAsset[];
   requiredRepoPaths?: string[];
+  agentWrapperFiles?: Partial<Record<AgentTarget, string[]>>;
 }
 
 export interface LoadedOSpecLiteProfile extends OSpecLiteProfile {
@@ -130,12 +139,30 @@ export interface LoadedOSpecLiteProfile extends OSpecLiteProfile {
 export interface ProfileTemplateValues {
   projectName: string;
   summary: string;
+  documentLanguage: DocumentLanguage;
+  bootstrapAgent: BootstrapAgent;
   docsRoot: string;
   agentDocsRoot: string;
   authoringPackRoot: string;
   profileId: string;
   managedStart: string;
   managedEnd: string;
+}
+
+export interface InitOptions {
+  documentLanguage?: DocumentLanguage;
+  profileId?: string;
+  projectName?: string;
+  bootstrapAgent?: BootstrapAgent;
+  hostAgent?: HostAgent;
+}
+
+export interface InitBootstrapPlan {
+  bootstrapAgent: BootstrapAgent;
+  hostAgent: HostAgent;
+  wrapperPath?: string;
+  nextStep?: string;
+  shouldBootstrapNow: boolean;
 }
 
 export interface DocChecklistSectionRule {

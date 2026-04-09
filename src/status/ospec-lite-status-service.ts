@@ -21,7 +21,10 @@ export class StatusService {
         : null;
 
     const missingMarkers: string[] = [];
-    for (const marker of this.getExpectedMarkers(config?.authoringPackRoot)) {
+    for (const marker of this.getExpectedMarkers(
+      config?.authoringPackRoot,
+      config?.profileOutputs
+    )) {
       if (!(await this.repo.exists(path.join(rootDir, marker)))) {
         missingMarkers.push(marker);
       }
@@ -51,17 +54,20 @@ export class StatusService {
     }
   }
 
-  private getExpectedMarkers(authoringPackRoot?: string): string[] {
-    if (!authoringPackRoot) {
-      return [...INIT_MARKERS];
+  private getExpectedMarkers(authoringPackRoot?: string, profileOutputs?: string[]): string[] {
+    const markers = new Set<string>(INIT_MARKERS);
+
+    if (authoringPackRoot) {
+      for (const fileName of AUTHORING_PACK_FILES) {
+        markers.add(path.join(authoringPackRoot, fileName).replace(/\\/g, "/"));
+      }
     }
 
-    return [
-      ...INIT_MARKERS,
-      ...AUTHORING_PACK_FILES.map((fileName) =>
-        path.join(authoringPackRoot, fileName).replace(/\\/g, "/")
-      )
-    ];
+    for (const output of profileOutputs ?? []) {
+      markers.add(output);
+    }
+
+    return [...markers];
   }
 
   private async listChangeNames(dirPath: string): Promise<string[]> {

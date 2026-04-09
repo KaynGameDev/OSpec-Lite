@@ -43,6 +43,7 @@ Rules:
 - profiles may override the initial markdown templates for a selected repo
 - profiles may add a shared authoring pack under `docs/agents/authoring/`
 - profiles may declare required repo paths that must exist before init can proceed
+- profiles may define profile-specific init questions and bootstrap defaults
 - profiles should encode repository-reading workflows, not project-private facts
 - profiles do not change the generic scanner or add direct model orchestration
 
@@ -78,6 +79,15 @@ changes/
 When a profile is selected, V1 `init` must also create:
 
 ```text
+.codex/
+  skills/
+    oslite-fill-project-docs/
+      SKILL.md
+
+.claude/
+  commands/
+    oslite-fill-project-docs.md
+
 docs/
   agents/
     authoring/
@@ -122,11 +132,16 @@ Example already-initialized log:
 OSpec Lite: repository already initialized
 Path: /path/to/repo
 Config: .oslite/config.json
+Project: repo-name
 Profile: unity-tolua-game
+Bootstrap agent: codex
 Agent targets: codex, claude-code
 Agent entry files:
 - codex: AGENTS.md
 - claude-code: CLAUDE.md
+Agent wrappers:
+- codex: .codex/skills/oslite-fill-project-docs/SKILL.md
+- claude-code: .claude/commands/oslite-fill-project-docs.md
 Project docs: docs/project
 Authoring pack: docs/agents/authoring
 Changes root: changes
@@ -218,12 +233,19 @@ Suggested schema:
     "codex": "AGENTS.md",
     "claude-code": "CLAUDE.md"
   },
+  "agentWrapperFiles": {
+    "codex": [".codex/skills/oslite-fill-project-docs/SKILL.md"],
+    "claude-code": [".claude/commands/oslite-fill-project-docs.md"]
+  },
+  "projectName": "repo-name",
+  "bootstrapAgent": "codex",
   "projectDocsRoot": "docs/project",
   "agentDocsRoot": "docs/agents",
   "changeRoot": "changes",
   "archiveLayout": "date-slug",
   "profileId": "unity-tolua-game",
-  "authoringPackRoot": "docs/agents/authoring"
+  "authoringPackRoot": "docs/agents/authoring",
+  "profileOutputs": []
 }
 ```
 
@@ -496,6 +518,23 @@ Rules:
 - `fill-project-docs.md` must prescribe a two-stage flow: collect evidence first, then fill final docs
 - `evidence-map.md` is the repo-local intermediate artifact that captures the evidence set before final docs are rewritten
 - agent-specific guidance should point to this pack instead of duplicating it
+- `unity-tolua-game` may prefill `project-brief.md` from init answers such as `projectName` and `bootstrapAgent`
+
+### Thin Agent Wrappers
+
+Profiled repositories may also generate thin agent wrappers that only point to the repo-local authoring pack.
+
+Examples:
+
+- Codex wrapper skill: `.codex/skills/oslite-fill-project-docs/SKILL.md`
+- Claude Code wrapper command: `.claude/commands/oslite-fill-project-docs.md`
+
+Rules:
+
+- wrappers should not define a second workflow
+- wrappers should point back to `docs/agents/authoring/fill-project-docs.md`
+- wrappers should remind the agent to fill `evidence-map.md` before final docs
+- wrappers should end by telling the agent to run `oslite docs verify .` when available
 
 ## Minimal Change Flow
 
@@ -544,6 +583,7 @@ Suggested schema:
 ```text
 oslite init .
 oslite init . --profile unity-tolua-game
+oslite init . --profile unity-tolua-game --project-name "My Game" --bootstrap-agent codex
 oslite status .
 oslite docs verify .
 oslite change new <slug> .
@@ -567,11 +607,16 @@ Suggested output:
 OSpec Lite Status
 Initialized: yes
 State: initialized
+Project: repo-name
 Profile: unity-tolua-game
+Bootstrap agent: codex
 Agent targets: codex, claude-code
 Agent entry files:
 - codex: AGENTS.md
 - claude-code: CLAUDE.md
+Agent wrappers:
+- codex: .codex/skills/oslite-fill-project-docs/SKILL.md
+- claude-code: .claude/commands/oslite-fill-project-docs.md
 Project docs: docs/project
 Authoring pack: docs/agents/authoring
 Changes root: changes

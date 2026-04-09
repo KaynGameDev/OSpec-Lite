@@ -41,6 +41,17 @@ export class ProfilePreconditionError extends OSpecLiteError {
   }
 }
 
+export class ProfileInitAnswersRequiredError extends OSpecLiteError {
+  constructor(
+    public readonly profileId: string,
+    public readonly missingFields: string[]
+  ) {
+    super(
+      `Profile ${profileId} requires these init values in non-interactive mode: ${missingFields.join(", ")}`
+    );
+  }
+}
+
 export class DocVerificationError extends OSpecLiteError {
   constructor(
     public readonly profileId: string,

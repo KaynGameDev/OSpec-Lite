@@ -14,6 +14,7 @@ V1 intentionally focuses on generic repo understanding plus first-class support 
 
 - `AGENTS.md`
 - `CLAUDE.md`
+- repo-local Codex and Claude Code wrappers
 
 ## Why It Exists
 
@@ -39,6 +40,7 @@ Instead of trying to solve every workflow problem up front, V1 keeps the surface
 - `CLAUDE.md` generation
 - `.oslite/index.json`
 - shared prompt packs under `docs/agents/authoring/`
+- thin repo-local wrappers that point agents at the shared authoring pack
 - `oslite docs verify`
 - minimal `change -> apply -> verify -> archive`
 
@@ -68,6 +70,7 @@ Run from this package directory:
 node ./dist/cli/index.js init ..
 node ./dist/cli/index.js init --document-language zh-CN ..
 node ./dist/cli/index.js init --profile unity-tolua-game ..
+node ./dist/cli/index.js init --profile unity-tolua-game --project-name "BuYuDaLuanDou" --bootstrap-agent codex ..
 node ./dist/cli/index.js status ..
 node ./dist/cli/index.js docs verify ..
 node ./dist/cli/index.js change new example-change ..
@@ -86,6 +89,7 @@ node ./dist/cli/index.js change new example-change ..
   - neutral doc skeletons
   - repo-local reading instructions
   - an evidence map workflow
+  - thin Codex / Claude Code wrappers that point to the shared workflow
   - checklist-driven verification
 
 ## Notes
@@ -93,3 +97,4 @@ node ./dist/cli/index.js change new example-change ..
 - V1 `init` is intentionally one-shot. If the repo is already initialized, it logs that state and exits.
 - V1 stays provider-agnostic. It prepares repo-local instructions for Codex and Claude Code, but does not orchestrate model calls directly.
 - The `unity-tolua-game` profile only hard-codes one project rule: `Script/MJGame.lua` is the main entry anchor.
+- `unity-tolua-game` can ask for `projectName` and `bootstrapAgent` during `init`; in non-interactive environments, pass `--project-name` and `--bootstrap-agent` explicitly.

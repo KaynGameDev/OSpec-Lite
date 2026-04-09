@@ -8,9 +8,19 @@
   "requiredRepoPaths": [
     "Script/MJGame.lua"
   ],
+  "agentWrapperFiles": {
+    "codex": [
+      ".codex/skills/oslite-fill-project-docs/SKILL.md"
+    ],
+    "claude-code": [
+      ".claude/commands/oslite-fill-project-docs.md"
+    ]
+  },
   "outputs": [
     "AGENTS.md",
     "CLAUDE.md",
+    ".codex/skills/oslite-fill-project-docs/SKILL.md",
+    ".claude/commands/oslite-fill-project-docs.md",
     "docs/project/overview.md",
     "docs/project/architecture.md",
     "docs/project/repo-map.md",
@@ -29,6 +39,8 @@
   "assets": [
     { "source": "templates/AGENTS.md", "target": "AGENTS.md", "mode": "managed-codex-section" },
     { "source": "templates/CLAUDE.md", "target": "CLAUDE.md", "mode": "managed-claude-section" },
+    { "source": "wrappers/codex/SKILL.md", "target": ".codex/skills/oslite-fill-project-docs/SKILL.md" },
+    { "source": "wrappers/claude/oslite-fill-project-docs.md", "target": ".claude/commands/oslite-fill-project-docs.md" },
     { "source": "templates/docs/project/overview.md", "target": "docs/project/overview.md" },
     { "source": "templates/docs/project/architecture.md", "target": "docs/project/architecture.md" },
     { "source": "templates/docs/project/repo-map.md", "target": "docs/project/repo-map.md" },

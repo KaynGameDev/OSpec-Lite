@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import * as path from "node:path";
+import { createInterface } from "node:readline/promises";
 import { FileRepo } from "../fs/file-repo";
 import { ScanService } from "../init/ospec-lite-scan-service";
 import { MarkdownRenderer } from "../render/ospec-lite-markdown-renderer";
@@ -9,14 +10,21 @@ import { IndexService } from "../init/ospec-lite-index-service";
 import { InitService } from "../init/ospec-lite-init-service";
 import { StatusService } from "../status/ospec-lite-status-service";
 import { ChangeService } from "../change/ospec-lite-change-service";
-import { DocumentLanguage } from "../core/ospec-lite-types";
+import {
+  BootstrapAgent,
+  DocumentLanguage,
+  HostAgent
+} from "../core/ospec-lite-types";
 import {
   DocVerificationError,
   InitIncompleteError,
-  OSpecLiteError
+  OSpecLiteError,
+  ProfileInitAnswersRequiredError
 } from "../core/ospec-lite-errors";
 import { ProfileLoader } from "../profile/ospec-lite-profile-loader";
 import { DocVerifierService } from "../docs/ospec-lite-doc-verifier-service";
+
+const UNITY_TOLUA_PROFILE_ID = "unity-tolua-game";
 
 const repo = new FileRepo();
 const scanService = new ScanService(repo);
@@ -59,7 +67,8 @@ async function main(): Promise<void> {
 }
 
 async function handleInit(args: string[]): Promise<void> {
-  const { pathArg, documentLanguage, profileId } = parseInitArgs(args);
+  const { pathArg, documentLanguage, profileId, projectName, bootstrapAgent } =
+    parseInitArgs(args);
   const targetDir = path.resolve(pathArg);
   const before = await initService.getInitState(targetDir);
 
@@ -69,14 +78,21 @@ async function handleInit(args: string[]): Promise<void> {
     console.log(`Path: ${targetDir}`);
     console.log(`Config: ${path.relative(targetDir, before.configPath).replace(/\\/g, "/")}`);
     if (isCompleteStatusConfig(status.config)) {
+      if (status.config.projectName) {
+        console.log(`Project: ${status.config.projectName}`);
+      }
       if (status.config.profileId) {
         console.log(`Profile: ${status.config.profileId}`);
+      }
+      if (status.config.bootstrapAgent) {
+        console.log(`Bootstrap agent: ${status.config.bootstrapAgent}`);
       }
       console.log(`Agent targets: ${status.config.agentTargets.join(", ")}`);
       console.log("Agent entry files:");
       for (const [target, fileName] of Object.entries(status.config.agentEntryFiles)) {
         console.log(`- ${target}: ${fileName}`);
       }
+      printAgentWrappers(status.config.agentWrapperFiles);
       console.log(`Project docs: ${status.config.projectDocsRoot}`);
       if (status.config.authoringPackRoot) {
         console.log(`Authoring pack: ${status.config.authoringPackRoot}`);
@@ -90,13 +106,47 @@ async function handleInit(args: string[]): Promise<void> {
     throw new InitIncompleteError(before.missingMarkers);
   }
 
-  const result = await initService.init(targetDir, documentLanguage, profileId);
+  const resolvedAnswers = await resolveProfileInitAnswers(targetDir, {
+    profileId,
+    projectName,
+    bootstrapAgent
+  });
+  const result = await initService.init(targetDir, {
+    documentLanguage,
+    profileId,
+    projectName: resolvedAnswers.projectName,
+    bootstrapAgent: resolvedAnswers.bootstrapAgent,
+    hostAgent: detectHostAgent()
+  });
   console.log("OSpec Lite: repository initialized");
   console.log(`Path: ${targetDir}`);
   console.log(`Config: ${path.relative(targetDir, result.configPath).replace(/\\/g, "/")}`);
   console.log(`Index: ${path.relative(targetDir, result.indexPath).replace(/\\/g, "/")}`);
-  if (profileId) {
-    console.log(`Profile: ${profileId}`);
+  if (result.config?.projectName) {
+    console.log(`Project: ${result.config.projectName}`);
+  }
+  if (result.config?.profileId) {
+    console.log(`Profile: ${result.config.profileId}`);
+  }
+  if (result.config?.bootstrapAgent) {
+    console.log(`Bootstrap agent: ${result.config.bootstrapAgent}`);
+  }
+  if (result.bootstrapPlan) {
+    if (result.bootstrapPlan.shouldBootstrapNow) {
+      console.log("Bootstrapping now...");
+      if (result.bootstrapPlan.wrapperPath) {
+        console.log(`Bootstrap wrapper: ${result.bootstrapPlan.wrapperPath}`);
+      }
+      if (result.bootstrapPlan.nextStep) {
+        console.log(`Bootstrap command: ${result.bootstrapPlan.nextStep}`);
+      }
+    } else if (result.bootstrapPlan.nextStep) {
+      console.log("Next step:");
+      console.log(result.bootstrapPlan.nextStep);
+      if (result.bootstrapPlan.wrapperPath) {
+        console.log(`Wrapper: ${result.bootstrapPlan.wrapperPath}`);
+      }
+    }
   }
 }
 
@@ -109,14 +159,21 @@ async function handleStatus(args: string[]): Promise<void> {
   console.log(`State: ${status.state}`);
 
   if (isCompleteStatusConfig(status.config)) {
+    if (status.config.projectName) {
+      console.log(`Project: ${status.config.projectName}`);
+    }
     if (status.config.profileId) {
       console.log(`Profile: ${status.config.profileId}`);
+    }
+    if (status.config.bootstrapAgent) {
+      console.log(`Bootstrap agent: ${status.config.bootstrapAgent}`);
     }
     console.log(`Agent targets: ${status.config.agentTargets.join(", ")}`);
     console.log("Agent entry files:");
     for (const [target, fileName] of Object.entries(status.config.agentEntryFiles)) {
       console.log(`- ${target}: ${fileName}`);
     }
+    printAgentWrappers(status.config.agentWrapperFiles);
     console.log(`Project docs: ${status.config.projectDocsRoot}`);
     if (status.config.authoringPackRoot) {
       console.log(`Authoring pack: ${status.config.authoringPackRoot}`);
@@ -197,10 +254,14 @@ function parseInitArgs(args: string[]): {
   pathArg: string;
   documentLanguage?: DocumentLanguage;
   profileId?: string;
+  projectName?: string;
+  bootstrapAgent?: BootstrapAgent;
 } {
   let pathArg: string | undefined;
   let documentLanguage: DocumentLanguage | undefined;
   let profileId: string | undefined;
+  let projectName: string | undefined;
+  let bootstrapAgent: BootstrapAgent | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -237,6 +298,36 @@ function parseInitArgs(args: string[]): {
       continue;
     }
 
+    if (arg === "--project-name") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new OSpecLiteError("Missing value for --project-name.");
+      }
+      projectName = value.trim();
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--project-name=")) {
+      projectName = arg.slice("--project-name=".length).trim();
+      continue;
+    }
+
+    if (arg === "--bootstrap-agent") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new OSpecLiteError("Missing value for --bootstrap-agent.");
+      }
+      bootstrapAgent = parseBootstrapAgent(value);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--bootstrap-agent=")) {
+      bootstrapAgent = parseBootstrapAgent(arg.slice("--bootstrap-agent=".length));
+      continue;
+    }
+
     if (arg.startsWith("--")) {
       throw new OSpecLiteError(`Unsupported option: ${arg}`);
     }
@@ -251,7 +342,9 @@ function parseInitArgs(args: string[]): {
   return {
     pathArg: pathArg ?? ".",
     documentLanguage,
-    profileId
+    profileId,
+    projectName,
+    bootstrapAgent
   };
 }
 
@@ -260,6 +353,13 @@ function parseDocumentLanguage(value: string): DocumentLanguage {
     return value;
   }
   throw new OSpecLiteError(`Unsupported document language: ${value}`);
+}
+
+function parseBootstrapAgent(value: string): BootstrapAgent {
+  if (value === "codex" || value === "claude-code" || value === "none") {
+    return value;
+  }
+  throw new OSpecLiteError(`Unsupported bootstrap agent: ${value}`);
 }
 
 function isCompleteStatusConfig(
@@ -271,6 +371,9 @@ function isCompleteStatusConfig(
   changeRoot: string;
   profileId?: string;
   authoringPackRoot?: string;
+  agentWrapperFiles?: Record<string, string[]>;
+  projectName?: string;
+  bootstrapAgent?: string;
 } {
   if (!value || typeof value !== "object") {
     return false;
@@ -283,6 +386,9 @@ function isCompleteStatusConfig(
     changeRoot?: unknown;
     profileId?: unknown;
     authoringPackRoot?: unknown;
+    agentWrapperFiles?: unknown;
+    projectName?: unknown;
+    bootstrapAgent?: unknown;
   };
 
   return (
@@ -294,16 +400,48 @@ function isCompleteStatusConfig(
     typeof candidate.projectDocsRoot === "string" &&
     typeof candidate.changeRoot === "string" &&
     (candidate.profileId === undefined || typeof candidate.profileId === "string") &&
+    (candidate.projectName === undefined || typeof candidate.projectName === "string") &&
+    (candidate.bootstrapAgent === undefined ||
+      candidate.bootstrapAgent === "codex" ||
+      candidate.bootstrapAgent === "claude-code" ||
+      candidate.bootstrapAgent === "none") &&
     (candidate.authoringPackRoot === undefined ||
-      typeof candidate.authoringPackRoot === "string")
+      typeof candidate.authoringPackRoot === "string") &&
+    (candidate.agentWrapperFiles === undefined ||
+      isStringArrayRecord(candidate.agentWrapperFiles))
   );
+}
+
+function isStringArrayRecord(value: unknown): value is Record<string, string[]> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  return Object.values(value).every(
+    (item) => Array.isArray(item) && item.every((entry) => typeof entry === "string")
+  );
+}
+
+function printAgentWrappers(
+  wrappers: Record<string, string[]> | undefined
+): void {
+  if (!wrappers || Object.keys(wrappers).length === 0) {
+    return;
+  }
+
+  console.log("Agent wrappers:");
+  for (const [target, files] of Object.entries(wrappers)) {
+    for (const filePath of files) {
+      console.log(`- ${target}: ${filePath}`);
+    }
+  }
 }
 
 function printHelp(): void {
   console.log(`oslite <command>
 
 Commands:
-  oslite init [path] [--document-language en-US|zh-CN] [--profile <profile-id>]
+  oslite init [path] [--document-language en-US|zh-CN] [--profile <profile-id>] [--project-name <name>] [--bootstrap-agent codex|claude-code|none]
   oslite status [path]
   oslite docs verify [path]
   oslite change new <slug> [path]
@@ -318,6 +456,12 @@ main().catch((error: unknown) => {
     for (const marker of error.missingMarkers) {
       console.error(`- ${marker}`);
     }
+    process.exitCode = 1;
+    return;
+  }
+
+  if (error instanceof ProfileInitAnswersRequiredError) {
+    console.error(error.message);
     process.exitCode = 1;
     return;
   }
@@ -340,3 +484,128 @@ main().catch((error: unknown) => {
   }
   process.exitCode = 1;
 });
+
+async function resolveProfileInitAnswers(
+  targetDir: string,
+  values: {
+    profileId?: string;
+    projectName?: string;
+    bootstrapAgent?: BootstrapAgent;
+  }
+): Promise<{
+  projectName?: string;
+  bootstrapAgent?: BootstrapAgent;
+}> {
+  if (values.profileId !== UNITY_TOLUA_PROFILE_ID) {
+    if (values.projectName || values.bootstrapAgent) {
+      throw new OSpecLiteError(
+        "--project-name and --bootstrap-agent are only supported with --profile unity-tolua-game."
+      );
+    }
+    return {};
+  }
+
+  const missingFields: string[] = [];
+  if (!values.projectName) {
+    missingFields.push("projectName");
+  }
+  if (!values.bootstrapAgent) {
+    missingFields.push("bootstrapAgent");
+  }
+
+  if (missingFields.length === 0) {
+    return values;
+  }
+
+  if (!isInteractiveInitAllowed()) {
+    throw new ProfileInitAnswersRequiredError(values.profileId, missingFields);
+  }
+
+  const defaults = {
+    projectName: path.basename(targetDir),
+    bootstrapAgent: "none" as BootstrapAgent
+  };
+  const prompter = await createInitPrompter();
+
+  try {
+    const projectName =
+      values.projectName ??
+      (await prompter.ask("Project name", defaults.projectName));
+    const bootstrapAnswer =
+      values.bootstrapAgent ??
+      (await prompter.ask(
+        "Bootstrap agent (codex/claude-code/none)",
+        defaults.bootstrapAgent
+      ).then((answer) => parseBootstrapAgent(answer)));
+
+    return {
+      projectName,
+      bootstrapAgent: bootstrapAnswer
+    };
+  } finally {
+    prompter.close();
+  }
+}
+
+function isInteractiveInitAllowed(): boolean {
+  return (
+    process.env.OSLITE_FORCE_INTERACTIVE === "1" ||
+    (process.stdin.isTTY === true && process.stdout.isTTY === true)
+  );
+}
+
+function detectHostAgent(): HostAgent {
+  const value = process.env.OSLITE_HOST_AGENT;
+  if (value === "codex" || value === "claude-code") {
+    return value;
+  }
+  return "unknown";
+}
+
+interface InitPrompter {
+  ask(label: string, defaultValue: string): Promise<string>;
+  close(): void;
+}
+
+async function createInitPrompter(): Promise<InitPrompter> {
+  if (process.stdin.isTTY === true && process.stdout.isTTY === true) {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    return {
+      ask: async (label: string, defaultValue: string) => {
+        const answer = (await rl.question(`${label} [${defaultValue}]: `)).trim();
+        return answer.length > 0 ? answer : defaultValue;
+      },
+      close: () => rl.close()
+    };
+  }
+
+  const answers = await readPromptAnswersFromStdin();
+  let cursor = 0;
+
+  return {
+    ask: async (label: string, defaultValue: string) => {
+      process.stdout.write(`${label} [${defaultValue}]: `);
+      const answer = (answers[cursor] ?? "").trim();
+      cursor += 1;
+      return answer.length > 0 ? answer : defaultValue;
+    },
+    close: () => undefined
+  };
+}
+
+async function readPromptAnswersFromStdin(): Promise<string[]> {
+  process.stdin.setEncoding("utf8");
+  let content = "";
+
+  for await (const chunk of process.stdin) {
+    content += chunk;
+  }
+
+  return content
+    .split(/\r?\n/)
+    .filter((line, index, items) => !(index === items.length - 1 && line.length === 0));
+}
