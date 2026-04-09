@@ -539,6 +539,8 @@ src/
     ospec-lite-codex-adapter.ts
     ospec-lite-claude-code-adapter.ts
     ospec-lite-agent-entry-service.ts
+    ospec-lite-agent-template-service.ts
+    templates/
   render/
     ospec-lite-markdown-renderer.ts
     templates/
