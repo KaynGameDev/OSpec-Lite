@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "profileId": "unity-tolua-game",
+  "placeholderPatterns": [
+    "待补充",
+    "TODO",
+    "TBD",
+    "(?m)^-\\s*$"
+  ],
+  "forbiddenPatterns": [
+    "(?m)^##\\s*Editor\\b",
+    "(?m)^###\\s*Editor\\b",
+    "(?m)^##\\s*Editor/",
+    "(?m)^###\\s*Editor/"
+  ],
+  "requiredEvidenceLabels": [
+    "结论",
+    "证据文件",
+    "确认状态",
+    "未确认点"
+  ],
+  "allowedStatuses": [
+    "确认",
+    "推断",
+    "待确认"
+  ],
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "requiredHeadings": [
+        "## What This Repo Is",
+        "## Hard Rules",
+        "## High-Risk Areas",
+        "## Read Next"
+      ],
+      "requiredSnippets": [
+        "docs/agents/authoring/fill-project-docs.md",
+        "docs/agents/authoring/evidence-map.md",
+        "Script/MJGame.lua"
+      ]
+    },
+    {
+      "path": "CLAUDE.md",
+      "requiredHeadings": [
+        "## Shared Instructions Import",
+        "## Claude Code Notes"
+      ],
+      "requiredSnippets": [
+        "@AGENTS.md",
+        "@docs/agents/authoring/fill-project-docs.md",
+        "@docs/agents/authoring/evidence-map.md"
+      ]
+    },
+    {
+      "path": "docs/project/overview.md",
+      "requiredHeadings": [
+        "## 项目是什么",
+        "## 正式主区",
+        "## 主流程",
+        "## 首次读库建议"
+      ],
+      "evidenceSections": [
+        "项目是什么",
+        "正式主区",
+        "主流程",
+        "首次读库建议"
+      ]
+    },
+    {
+      "path": "docs/project/architecture.md",
+      "requiredHeadings": [
+        "## 启动链",
+        "## 进入 / 登录 / 加载链",
+        "## 运行链",
+        "## 退出 / 回宿主链",
+        "## 层级与边界"
+      ],
+      "evidenceSections": [
+        "启动链",
+        "进入 / 登录 / 加载链",
+        "运行链",
+        "退出 / 回宿主链",
+        "层级与边界"
+      ]
+    },
+    {
+      "path": "docs/project/repo-map.md",
+      "requiredHeadings": [
+        "## 主代码目录",
+        "## 目录职责导航",
+        "## 改动导航",
+        "## 非核心区域"
+      ],
+      "evidenceSections": [
+        "主代码目录",
+        "目录职责导航",
+        "改动导航",
+        "非核心区域"
+      ]
+    },
+    {
+      "path": "docs/project/entrypoints.md",
+      "requiredHeadings": [
+        "## 启动入口",
+        "## 主流程入口",
+        "## UI 栈入口",
+        "## 网络入口",
+        "## 资源入口",
+        "## 退出入口"
+      ],
+      "evidenceSections": [
+        "启动入口",
+        "主流程入口",
+        "UI 栈入口",
+        "网络入口",
+        "资源入口",
+        "退出入口"
+      ],
+      "sectionRules": [
+        {
+          "heading": "启动入口",
+          "requiredSnippets": [
+            "Script/MJGame.lua"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "docs/project/glossary.md",
+      "requiredHeadings": [
+        "## 业务术语",
+        "## 工程术语",
+        "## 框架术语",
+        "## 待确认术语"
+      ],
+      "evidenceSections": [
+        "业务术语",
+        "工程术语",
+        "框架术语",
+        "待确认术语"
+      ]
+    },
+    {
+      "path": "docs/project/coding-rules.md",
+      "requiredHeadings": [
+        "## 命名与注释",
+        "## 模块边界",
+        "## 生命周期清理",
+        "## 配置与资源修改",
+        "## Code Review 高频坑位"
+      ],
+      "evidenceSections": [
+        "命名与注释",
+        "模块边界",
+        "生命周期清理",
+        "配置与资源修改",
+        "Code Review 高频坑位"
+      ]
+    },
+    {
+      "path": "docs/agents/quickstart.md",
+      "requiredHeadings": [
+        "## 推荐阅读顺序",
+        "## 推荐检索关键词",
+        "## Review 优先检查项",
+        "## 不要浪费时间的区域"
+      ],
+      "requiredSnippets": [
+        "Script/MJGame.lua",
+        "AssetBundle"
+      ]
+    },
+    {
+      "path": "docs/agents/change-playbook.md",
+      "requiredHeadings": [
+        "## 开始前",
+        "## 何时必须同步更新文档",
+        "## 何时不要写进核心项目文档",
+        "## 完成前自查"
+      ],
+      "requiredSnippets": [
+        "oslite docs verify .",
+        "evidence-map.md"
+      ]
+    },
+    {
+      "path": "docs/agents/authoring/doc-contract.md",
+      "requiredHeadings": [
+        "## 目标",
+        "## 文档范围",
+        "## 工作方式",
+        "## 关键写作规则",
+        "## 排除范围"
+      ],
+      "requiredSnippets": [
+        "Script/MJGame.lua",
+        "推断",
+        "待确认"
+      ],
+      "skipPlaceholderCheck": true
+    },
+    {
+      "path": "docs/agents/authoring/project-brief.md",
+      "requiredHeadings": [
+        "## 基础信息",
+        "## 主代码目录候选",
+        "## 明确排除目录",
+        "## 已知入口提示",
+        "## 其他项目提示"
+      ],
+      "requiredSnippets": [
+        "Script/MJGame.lua"
+      ],
+      "skipPlaceholderCheck": true
+    },
+    {
+      "path": "docs/agents/authoring/repo-reading-checklist.md",
+      "requiredHeadings": [
+        "## 顶层结构",
+        "## 入口与流程",
+        "## 资源与网络",
+        "## 生命周期",
+        "## 边界与技术栈"
+      ],
+      "requiredSnippets": [
+        "Script/MJGame.lua",
+        "Unity",
+        "ToLua"
+      ],
+      "skipPlaceholderCheck": true
+    },
+    {
+      "path": "docs/agents/authoring/evidence-map.md",
+      "requiredHeadings": [
+        "## 顶层主区判断",
+        "## 主入口与启动链",
+        "## 主流程与 UI 切换",
+        "## 网络入口",
+        "## 资源与配置入口",
+        "## 生命周期",
+        "## 外部边界",
+        "## 技术栈特征"
+      ],
+      "evidenceSections": [
+        "顶层主区判断",
+        "主入口与启动链",
+        "主流程与 UI 切换",
+        "网络入口",
+        "资源与配置入口",
+        "生命周期",
+        "外部边界",
+        "技术栈特征"
+      ],
+      "sectionRules": [
+        {
+          "heading": "主入口与启动链",
+          "requiredSnippets": [
+            "Script/MJGame.lua"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "docs/agents/authoring/fill-project-docs.md",
+      "requiredHeadings": [
+        "## 阶段一：先读仓库并填写证据地图",
+        "## 阶段二：根据证据回填正式文档",
+        "## 停止前自查",
+        "## 最终文档应回答"
+      ],
+      "requiredSnippets": [
+        "Script/MJGame.lua",
+        "oslite docs verify .",
+        "evidence-map.md"
+      ],
+      "skipPlaceholderCheck": true
+    },
+    {
+      "path": "docs/agents/authoring/doc-task-checklist.json",
+      "requiredPatterns": [
+        "\"profileId\"\\s*:\\s*\"unity-tolua-game\"",
+        "\"sectionRules\"",
+        "\"requiredEvidenceLabels\""
+      ],
+      "skipPlaceholderCheck": true
+    }
+  ]
+}

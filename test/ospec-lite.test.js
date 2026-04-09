@@ -15,6 +15,7 @@ const { IndexService } = require("../dist/init/ospec-lite-index-service.js");
 const { InitService } = require("../dist/init/ospec-lite-init-service.js");
 const { StatusService } = require("../dist/status/ospec-lite-status-service.js");
 const { ChangeService } = require("../dist/change/ospec-lite-change-service.js");
+const { ProfileLoader } = require("../dist/profile/ospec-lite-profile-loader.js");
 const {
   AGENTS_MANAGED_END,
   AGENTS_MANAGED_START,
@@ -109,6 +110,8 @@ test("cli prints help when no command is provided", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^oslite <command>/m);
   assert.match(result.stdout, /oslite status \[path]/);
+  assert.match(result.stdout, /oslite docs verify \[path]/);
+  assert.match(result.stdout, /--profile <profile-id>/);
   assert.equal(result.stderr, "");
 });
 
@@ -484,12 +487,14 @@ function createServices() {
   const renderer = new MarkdownRenderer();
   const agentEntries = new AgentEntryService(repo);
   const indexService = new IndexService();
+  const profileLoader = new ProfileLoader(repo);
   const initService = new InitService(
     repo,
     scanService,
     renderer,
     agentEntries,
-    indexService
+    indexService,
+    profileLoader
   );
   const statusService = new StatusService(repo);
   const changeService = new ChangeService(repo, statusService);

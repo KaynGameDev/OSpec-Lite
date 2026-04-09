@@ -10,16 +10,31 @@ import { InitService } from "../init/ospec-lite-init-service";
 import { StatusService } from "../status/ospec-lite-status-service";
 import { ChangeService } from "../change/ospec-lite-change-service";
 import { DocumentLanguage } from "../core/ospec-lite-types";
-import { InitIncompleteError, OSpecLiteError } from "../core/ospec-lite-errors";
+import {
+  DocVerificationError,
+  InitIncompleteError,
+  OSpecLiteError
+} from "../core/ospec-lite-errors";
+import { ProfileLoader } from "../profile/ospec-lite-profile-loader";
+import { DocVerifierService } from "../docs/ospec-lite-doc-verifier-service";
 
 const repo = new FileRepo();
 const scanService = new ScanService(repo);
 const renderer = new MarkdownRenderer();
 const agentEntries = new AgentEntryService(repo);
 const indexService = new IndexService();
-const initService = new InitService(repo, scanService, renderer, agentEntries, indexService);
+const profileLoader = new ProfileLoader(repo);
+const initService = new InitService(
+  repo,
+  scanService,
+  renderer,
+  agentEntries,
+  indexService,
+  profileLoader
+);
 const statusService = new StatusService(repo);
 const changeService = new ChangeService(repo, statusService);
+const docVerifier = new DocVerifierService(repo);
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -35,13 +50,16 @@ async function main(): Promise<void> {
     case "change":
       await handleChange(rest);
       return;
+    case "docs":
+      await handleDocs(rest);
+      return;
     default:
       printHelp();
   }
 }
 
 async function handleInit(args: string[]): Promise<void> {
-  const { pathArg, documentLanguage } = parseInitArgs(args);
+  const { pathArg, documentLanguage, profileId } = parseInitArgs(args);
   const targetDir = path.resolve(pathArg);
   const before = await initService.getInitState(targetDir);
 
@@ -51,12 +69,18 @@ async function handleInit(args: string[]): Promise<void> {
     console.log(`Path: ${targetDir}`);
     console.log(`Config: ${path.relative(targetDir, before.configPath).replace(/\\/g, "/")}`);
     if (isCompleteStatusConfig(status.config)) {
+      if (status.config.profileId) {
+        console.log(`Profile: ${status.config.profileId}`);
+      }
       console.log(`Agent targets: ${status.config.agentTargets.join(", ")}`);
       console.log("Agent entry files:");
       for (const [target, fileName] of Object.entries(status.config.agentEntryFiles)) {
         console.log(`- ${target}: ${fileName}`);
       }
       console.log(`Project docs: ${status.config.projectDocsRoot}`);
+      if (status.config.authoringPackRoot) {
+        console.log(`Authoring pack: ${status.config.authoringPackRoot}`);
+      }
       console.log(`Changes root: ${status.config.changeRoot}`);
     }
     return;
@@ -66,11 +90,14 @@ async function handleInit(args: string[]): Promise<void> {
     throw new InitIncompleteError(before.missingMarkers);
   }
 
-  const result = await initService.init(targetDir, documentLanguage);
+  const result = await initService.init(targetDir, documentLanguage, profileId);
   console.log("OSpec Lite: repository initialized");
   console.log(`Path: ${targetDir}`);
   console.log(`Config: ${path.relative(targetDir, result.configPath).replace(/\\/g, "/")}`);
   console.log(`Index: ${path.relative(targetDir, result.indexPath).replace(/\\/g, "/")}`);
+  if (profileId) {
+    console.log(`Profile: ${profileId}`);
+  }
 }
 
 async function handleStatus(args: string[]): Promise<void> {
@@ -82,12 +109,18 @@ async function handleStatus(args: string[]): Promise<void> {
   console.log(`State: ${status.state}`);
 
   if (isCompleteStatusConfig(status.config)) {
+    if (status.config.profileId) {
+      console.log(`Profile: ${status.config.profileId}`);
+    }
     console.log(`Agent targets: ${status.config.agentTargets.join(", ")}`);
     console.log("Agent entry files:");
     for (const [target, fileName] of Object.entries(status.config.agentEntryFiles)) {
       console.log(`- ${target}: ${fileName}`);
     }
     console.log(`Project docs: ${status.config.projectDocsRoot}`);
+    if (status.config.authoringPackRoot) {
+      console.log(`Authoring pack: ${status.config.authoringPackRoot}`);
+    }
     console.log(`Changes root: ${status.config.changeRoot}`);
   } else if (status.config) {
     console.log("Config: incomplete or invalid");
@@ -140,12 +173,34 @@ async function handleChange(args: string[]): Promise<void> {
   }
 }
 
+async function handleDocs(args: string[]): Promise<void> {
+  const [action, ...rest] = args;
+  switch (action) {
+    case "verify": {
+      const targetDir = path.resolve(rest[0] ?? ".");
+      const report = await docVerifier.verify(targetDir);
+      console.log("OSpec Lite docs verification passed");
+      console.log(`Profile: ${report.profileId}`);
+      console.log(`Checklist: ${report.checklistPath}`);
+      console.log("Checked files:");
+      for (const filePath of report.checkedFiles) {
+        console.log(`- ${filePath}`);
+      }
+      return;
+    }
+    default:
+      throw new OSpecLiteError(`Unsupported docs action: ${action ?? "(missing)"}`);
+  }
+}
+
 function parseInitArgs(args: string[]): {
   pathArg: string;
   documentLanguage?: DocumentLanguage;
+  profileId?: string;
 } {
   let pathArg: string | undefined;
   let documentLanguage: DocumentLanguage | undefined;
+  let profileId: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -167,6 +222,21 @@ function parseInitArgs(args: string[]): {
       continue;
     }
 
+    if (arg === "--profile") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new OSpecLiteError("Missing value for --profile.");
+      }
+      profileId = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--profile=")) {
+      profileId = arg.slice("--profile=".length);
+      continue;
+    }
+
     if (arg.startsWith("--")) {
       throw new OSpecLiteError(`Unsupported option: ${arg}`);
     }
@@ -180,7 +250,8 @@ function parseInitArgs(args: string[]): {
 
   return {
     pathArg: pathArg ?? ".",
-    documentLanguage
+    documentLanguage,
+    profileId
   };
 }
 
@@ -198,6 +269,8 @@ function isCompleteStatusConfig(
   agentEntryFiles: Record<string, string>;
   projectDocsRoot: string;
   changeRoot: string;
+  profileId?: string;
+  authoringPackRoot?: string;
 } {
   if (!value || typeof value !== "object") {
     return false;
@@ -208,6 +281,8 @@ function isCompleteStatusConfig(
     agentEntryFiles?: unknown;
     projectDocsRoot?: unknown;
     changeRoot?: unknown;
+    profileId?: unknown;
+    authoringPackRoot?: unknown;
   };
 
   return (
@@ -217,7 +292,10 @@ function isCompleteStatusConfig(
     typeof candidate.agentEntryFiles === "object" &&
     Object.values(candidate.agentEntryFiles).every((item) => typeof item === "string") &&
     typeof candidate.projectDocsRoot === "string" &&
-    typeof candidate.changeRoot === "string"
+    typeof candidate.changeRoot === "string" &&
+    (candidate.profileId === undefined || typeof candidate.profileId === "string") &&
+    (candidate.authoringPackRoot === undefined ||
+      typeof candidate.authoringPackRoot === "string")
   );
 }
 
@@ -225,8 +303,9 @@ function printHelp(): void {
   console.log(`oslite <command>
 
 Commands:
-  oslite init [path] [--document-language en-US|zh-CN]
+  oslite init [path] [--document-language en-US|zh-CN] [--profile <profile-id>]
   oslite status [path]
+  oslite docs verify [path]
   oslite change new <slug> [path]
   oslite change apply <change-path>
   oslite change verify <change-path>
@@ -238,6 +317,17 @@ main().catch((error: unknown) => {
     console.error("OSpec Lite: initialization incomplete");
     for (const marker of error.missingMarkers) {
       console.error(`- ${marker}`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+
+  if (error instanceof DocVerificationError) {
+    console.error("OSpec Lite docs verification failed");
+    console.error(`Profile: ${error.profileId}`);
+    console.error(`Checklist: ${error.checklistPath}`);
+    for (const issue of error.issues) {
+      console.error(`- ${issue.file}: ${issue.message}`);
     }
     process.exitCode = 1;
     return;

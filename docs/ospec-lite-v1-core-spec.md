@@ -6,7 +6,7 @@ This document defines the core V1 implementation of `ospec-lite`.
 
 V1 core is intentionally generic:
 
-- no stack-specific profile logic
+- no stack-specific logic hard-coded into the scanner
 - no plugin runtime
 - no queue runner
 - no doc regeneration after init
@@ -20,6 +20,7 @@ After `oslite init .`, a team member should be able to open either Codex or Clau
 - clear top-level agent instructions
 - a small project knowledge layer
 - a machine-readable project summary
+- an optional repo-local authoring pack
 - a simple change workflow
 
 ## Built-In Agent Targets
@@ -30,6 +31,20 @@ V1 core explicitly supports these two agent targets:
 - `claude-code`
 
 This support belongs in the core because these tools are the primary consumers of the generated repo knowledge.
+
+## Optional Profiles
+
+V1 core may optionally initialize a repository with an asset-based profile.
+
+Rules:
+
+- profiles live under `profiles/<id>/`
+- profiles are content packs, not executable plugins
+- profiles may override the initial markdown templates for a selected repo
+- profiles may add a shared authoring pack under `docs/agents/authoring/`
+- profiles may declare required repo paths that must exist before init can proceed
+- profiles should encode repository-reading workflows, not project-private facts
+- profiles do not change the generic scanner or add direct model orchestration
 
 ## Core Outputs
 
@@ -58,6 +73,20 @@ docs/
 changes/
   active/
   archived/
+```
+
+When a profile is selected, V1 `init` must also create:
+
+```text
+docs/
+  agents/
+    authoring/
+      doc-contract.md
+      project-brief.md
+      repo-reading-checklist.md
+      evidence-map.md
+      fill-project-docs.md
+      doc-task-checklist.json
 ```
 
 ## One-Time Init Behavior
@@ -93,11 +122,13 @@ Example already-initialized log:
 OSpec Lite: repository already initialized
 Path: /path/to/repo
 Config: .oslite/config.json
+Profile: unity-tolua-game
 Agent targets: codex, claude-code
 Agent entry files:
 - codex: AGENTS.md
 - claude-code: CLAUDE.md
 Project docs: docs/project
+Authoring pack: docs/agents/authoring
 Changes root: changes
 ```
 
@@ -190,7 +221,9 @@ Suggested schema:
   "projectDocsRoot": "docs/project",
   "agentDocsRoot": "docs/agents",
   "changeRoot": "changes",
-  "archiveLayout": "date-slug"
+  "archiveLayout": "date-slug",
+  "profileId": "unity-tolua-game",
+  "authoringPackRoot": "docs/agents/authoring"
 }
 ```
 
@@ -442,6 +475,28 @@ Required sections:
 - Record Verification
 - Archive When Done
 
+### `docs/agents/authoring/*`
+
+Purpose:
+
+- hold the shared repo-local prompt pack used by both Codex and Claude Code
+
+Required files:
+
+- `doc-contract.md`
+- `project-brief.md`
+- `repo-reading-checklist.md`
+- `evidence-map.md`
+- `fill-project-docs.md`
+- `doc-task-checklist.json`
+
+Rules:
+
+- `doc-task-checklist.json` is the source of truth for documentation verification
+- `fill-project-docs.md` must prescribe a two-stage flow: collect evidence first, then fill final docs
+- `evidence-map.md` is the repo-local intermediate artifact that captures the evidence set before final docs are rewritten
+- agent-specific guidance should point to this pack instead of duplicating it
+
 ## Minimal Change Flow
 
 Each active change lives under:
@@ -488,7 +543,9 @@ Suggested schema:
 
 ```text
 oslite init .
+oslite init . --profile unity-tolua-game
 oslite status .
+oslite docs verify .
 oslite change new <slug> .
 oslite change apply <path>
 oslite change verify <path>
@@ -510,15 +567,28 @@ Suggested output:
 OSpec Lite Status
 Initialized: yes
 State: initialized
+Profile: unity-tolua-game
 Agent targets: codex, claude-code
 Agent entry files:
 - codex: AGENTS.md
 - claude-code: CLAUDE.md
 Project docs: docs/project
+Authoring pack: docs/agents/authoring
 Changes root: changes
 Active changes: 1
 Archived changes: 4
 ```
+
+## `docs verify`
+
+`oslite docs verify .` is a deterministic verifier for profile-driven documentation.
+
+Rules:
+
+- load `docs/agents/authoring/doc-task-checklist.json`
+- fail on missing authoring-pack files, missing headings, placeholder text, missing evidence blocks, missing status markers, missing evidence paths, and forbidden scope expansion
+- allow profile-specific rules such as section-level required snippets
+- print the active profile id and enumerated violations on failure
 
 ## Internal Module Layout
 
@@ -552,6 +622,11 @@ src/
     ospec-lite-change-service.ts
     ospec-lite-change-template-service.ts
     templates/
+  docs/
+    ospec-lite-doc-verifier-service.ts
+  profile/
+    ospec-lite-profile-loader.ts
+    ospec-lite-profile-template-service.ts
   status/
     ospec-lite-status-service.ts
 ```
@@ -570,11 +645,11 @@ src/
 
 ## Out Of Scope For V1
 
-- stack-specific profiles
 - doc regeneration after init
 - queue execution
 - plugin workflows
 - Jira or Excel import
 - merge logic for human-edited knowledge docs
 
-Those can be layered later without changing the V1 core contract.
+V1 includes asset-based profiles, but not executable profile plugins or provider-managed doc generation.
+The `unity-tolua-game` profile may hard-code `Script/MJGame.lua` as the main entry anchor, but other project facts must come from the repo-local evidence workflow.

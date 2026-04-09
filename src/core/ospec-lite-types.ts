@@ -6,6 +6,11 @@ export type InitState = "uninitialized" | "initialized" | "incomplete";
 
 export type ChangeStatus = "draft" | "active" | "applied" | "verified" | "archived";
 
+export type ProfileAssetMode =
+  | "write-if-missing"
+  | "managed-codex-section"
+  | "managed-claude-section";
+
 export interface OSpecLiteConfig {
   version: 1;
   documentLanguage: DocumentLanguage;
@@ -16,6 +21,8 @@ export interface OSpecLiteConfig {
   agentDocsRoot: string;
   changeRoot: string;
   archiveLayout: "date-slug";
+  profileId?: string;
+  authoringPackRoot?: string;
 }
 
 export interface RuleItem {
@@ -95,4 +102,78 @@ export interface StatusReport {
   config: OSpecLiteConfig | null;
   activeChanges: string[];
   archivedChanges: string[];
+}
+
+export interface OSpecLiteProfileAsset {
+  source: string;
+  target: string;
+  mode?: ProfileAssetMode;
+}
+
+export interface OSpecLiteProfile {
+  version: 1;
+  id: string;
+  displayName: string;
+  description: string;
+  documentLanguage: DocumentLanguage;
+  authoringPackRoot: string;
+  outputs: string[];
+  assets: OSpecLiteProfileAsset[];
+  requiredRepoPaths?: string[];
+}
+
+export interface LoadedOSpecLiteProfile extends OSpecLiteProfile {
+  rootDir: string;
+  profileJsonPath: string;
+}
+
+export interface ProfileTemplateValues {
+  projectName: string;
+  summary: string;
+  docsRoot: string;
+  agentDocsRoot: string;
+  authoringPackRoot: string;
+  profileId: string;
+  managedStart: string;
+  managedEnd: string;
+}
+
+export interface DocChecklistSectionRule {
+  heading: string;
+  requiredSnippets?: string[];
+  requiredPatterns?: string[];
+  forbiddenPatterns?: string[];
+}
+
+export interface DocChecklistFile {
+  path: string;
+  requiredHeadings?: string[];
+  requiredSnippets?: string[];
+  requiredPatterns?: string[];
+  forbiddenPatterns?: string[];
+  evidenceSections?: string[];
+  sectionRules?: DocChecklistSectionRule[];
+  skipPlaceholderCheck?: boolean;
+}
+
+export interface DocTaskChecklist {
+  version: 1;
+  profileId: string;
+  placeholderPatterns: string[];
+  forbiddenPatterns: string[];
+  requiredEvidenceLabels: string[];
+  allowedStatuses: string[];
+  files: DocChecklistFile[];
+}
+
+export interface DocVerificationIssue {
+  file: string;
+  message: string;
+}
+
+export interface DocVerificationReport {
+  profileId: string;
+  checklistPath: string;
+  checkedFiles: string[];
+  issues: DocVerificationIssue[];
 }

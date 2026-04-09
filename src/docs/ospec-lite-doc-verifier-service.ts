@@ -1,0 +1,378 @@
+import * as path from "node:path";
+import {
+  AUTHORING_PACK_FILES,
+  DEFAULT_AUTHORING_PACK_ROOT,
+  OSPEC_LITE_DIR
+} from "../core/ospec-lite-schema";
+import {
+  DocChecklistFile,
+  DocChecklistSectionRule,
+  DocTaskChecklist,
+  DocVerificationIssue,
+  DocVerificationReport,
+  OSpecLiteConfig
+} from "../core/ospec-lite-types";
+import {
+  DocVerificationError,
+  NotInitializedError,
+  OSpecLiteError
+} from "../core/ospec-lite-errors";
+import { FileRepo } from "../fs/file-repo";
+
+const EVIDENCE_LABELS = ["结论", "证据文件", "确认状态", "未确认点"] as const;
+
+export class DocVerifierService {
+  constructor(private readonly repo: FileRepo) {}
+
+  async verify(rootDir: string): Promise<DocVerificationReport> {
+    const configPath = path.join(rootDir, OSPEC_LITE_DIR, "config.json");
+    if (!(await this.repo.exists(configPath))) {
+      throw new NotInitializedError(rootDir);
+    }
+
+    const config = await this.repo.readJson<OSpecLiteConfig>(configPath);
+    if (!config.profileId) {
+      throw new OSpecLiteError("This repository does not have an active ospec-lite profile.");
+    }
+
+    const authoringPackRoot = config.authoringPackRoot ?? DEFAULT_AUTHORING_PACK_ROOT;
+    const checklistPath = path.join(rootDir, authoringPackRoot, "doc-task-checklist.json");
+    if (!(await this.repo.exists(checklistPath))) {
+      throw new OSpecLiteError(
+        `Missing documentation checklist: ${path.relative(rootDir, checklistPath).replace(/\\/g, "/")}`
+      );
+    }
+
+    for (const fileName of AUTHORING_PACK_FILES) {
+      const absolutePath = path.join(rootDir, authoringPackRoot, fileName);
+      if (!(await this.repo.exists(absolutePath))) {
+        throw new OSpecLiteError(
+          `Missing authoring pack file: ${path.relative(rootDir, absolutePath).replace(/\\/g, "/")}`
+        );
+      }
+    }
+
+    const checklist = await this.repo.readJson<DocTaskChecklist>(checklistPath);
+    const issues: DocVerificationIssue[] = [];
+    const checkedFiles: string[] = [];
+
+    if (checklist.profileId !== config.profileId) {
+      issues.push({
+        file: path.relative(rootDir, checklistPath).replace(/\\/g, "/"),
+        message: `Checklist profile id ${checklist.profileId} does not match config profile ${config.profileId}.`
+      });
+    }
+
+    for (const fileRule of checklist.files) {
+      checkedFiles.push(fileRule.path);
+      await this.verifyFile(rootDir, checklist, fileRule, issues);
+    }
+
+    const report: DocVerificationReport = {
+      profileId: config.profileId,
+      checklistPath: path.relative(rootDir, checklistPath).replace(/\\/g, "/"),
+      checkedFiles,
+      issues
+    };
+
+    if (issues.length > 0) {
+      throw new DocVerificationError(report.profileId, report.checklistPath, report.issues);
+    }
+
+    return report;
+  }
+
+  private async verifyFile(
+    rootDir: string,
+    checklist: DocTaskChecklist,
+    fileRule: DocChecklistFile,
+    issues: DocVerificationIssue[]
+  ): Promise<void> {
+    const targetPath = path.join(rootDir, fileRule.path);
+    if (!(await this.repo.exists(targetPath))) {
+      issues.push({
+        file: fileRule.path,
+        message: "Missing required file."
+      });
+      return;
+    }
+
+    const content = await this.repo.readText(targetPath);
+
+    this.checkHeadings(fileRule, content, issues);
+    this.checkRequiredSnippets(fileRule.path, fileRule.requiredSnippets ?? [], content, issues);
+    this.checkRequiredPatterns(fileRule.path, fileRule.requiredPatterns ?? [], content, issues);
+
+    if (!fileRule.skipPlaceholderCheck) {
+      this.checkPatternHits(
+        fileRule.path,
+        checklist.placeholderPatterns,
+        content,
+        issues,
+        "Contains placeholder text that must be replaced."
+      );
+    }
+
+    this.checkPatternHits(
+      fileRule.path,
+      checklist.forbiddenPatterns,
+      content,
+      issues,
+      "Contains content forbidden by the active profile."
+    );
+    this.checkPatternHits(
+      fileRule.path,
+      fileRule.forbiddenPatterns ?? [],
+      content,
+      issues,
+      "Contains file-specific forbidden content."
+    );
+
+    await this.checkEvidenceSections(rootDir, checklist, fileRule, content, issues);
+    this.checkSectionRules(fileRule.path, fileRule.sectionRules ?? [], content, issues);
+  }
+
+  private checkHeadings(
+    fileRule: DocChecklistFile,
+    content: string,
+    issues: DocVerificationIssue[]
+  ): void {
+    for (const heading of fileRule.requiredHeadings ?? []) {
+      if (!content.includes(heading)) {
+        issues.push({
+          file: fileRule.path,
+          message: `Missing required heading: ${heading}`
+        });
+      }
+    }
+  }
+
+  private checkRequiredSnippets(
+    filePath: string,
+    snippets: string[],
+    content: string,
+    issues: DocVerificationIssue[]
+  ): void {
+    for (const snippet of snippets) {
+      if (!content.includes(snippet)) {
+        issues.push({
+          file: filePath,
+          message: `Missing required snippet: ${snippet}`
+        });
+      }
+    }
+  }
+
+  private checkRequiredPatterns(
+    filePath: string,
+    patterns: string[],
+    content: string,
+    issues: DocVerificationIssue[]
+  ): void {
+    for (const pattern of patterns) {
+      const regex = this.compilePattern(pattern);
+      if (!regex.test(content)) {
+        issues.push({
+          file: filePath,
+          message: `Missing required pattern: ${pattern}`
+        });
+      }
+    }
+  }
+
+  private checkPatternHits(
+    filePath: string,
+    patterns: string[],
+    content: string,
+    issues: DocVerificationIssue[],
+    message: string
+  ): void {
+    for (const pattern of patterns) {
+      const regex = this.compilePattern(pattern);
+      if (regex.test(content)) {
+        issues.push({
+          file: filePath,
+          message: `${message} Pattern: ${pattern}`
+        });
+      }
+    }
+  }
+
+  private async checkEvidenceSections(
+    rootDir: string,
+    checklist: DocTaskChecklist,
+    fileRule: DocChecklistFile,
+    content: string,
+    issues: DocVerificationIssue[]
+  ): Promise<void> {
+    for (const heading of fileRule.evidenceSections ?? []) {
+      const section = this.extractSection(content, heading);
+      if (!section) {
+        issues.push({
+          file: fileRule.path,
+          message: `Missing evidence section: ${heading}`
+        });
+        continue;
+      }
+
+      for (const label of checklist.requiredEvidenceLabels) {
+        const labelRegex = new RegExp(`${this.escapeRegex(label)}[：:]`, "m");
+        if (!labelRegex.test(section)) {
+          issues.push({
+            file: fileRule.path,
+            message: `Section ${heading} is missing label ${label}`
+          });
+        }
+      }
+
+      const evidenceBlock = this.extractLabeledBlock(section, "证据文件");
+      if (!evidenceBlock || evidenceBlock.paths.length === 0) {
+        issues.push({
+          file: fileRule.path,
+          message: `Section ${heading} must list at least one evidence file.`
+        });
+      } else {
+        for (const evidencePath of evidenceBlock.paths) {
+          if (!(await this.repo.exists(path.join(rootDir, evidencePath)))) {
+            issues.push({
+              file: fileRule.path,
+              message: `Section ${heading} references missing evidence path: ${evidencePath}`
+            });
+          }
+        }
+      }
+
+      const statusBlock = this.extractLabeledBlock(section, "确认状态");
+      if (!statusBlock) {
+        issues.push({
+          file: fileRule.path,
+          message: `Section ${heading} is missing 确认状态内容。`
+        });
+      } else if (
+        !checklist.allowedStatuses.some((status) =>
+          new RegExp(`(^|\\s|- )${this.escapeRegex(status)}($|\\s)`, "m").test(
+            statusBlock.content
+          )
+        )
+      ) {
+        issues.push({
+          file: fileRule.path,
+          message: `Section ${heading} must use one of the allowed statuses: ${checklist.allowedStatuses.join(", ")}`
+        });
+      }
+    }
+  }
+
+  private checkSectionRules(
+    filePath: string,
+    sectionRules: DocChecklistSectionRule[],
+    content: string,
+    issues: DocVerificationIssue[]
+  ): void {
+    for (const rule of sectionRules) {
+      const section = this.extractSection(content, rule.heading);
+      if (!section) {
+        issues.push({
+          file: filePath,
+          message: `Missing section required by sectionRules: ${rule.heading}`
+        });
+        continue;
+      }
+
+      for (const snippet of rule.requiredSnippets ?? []) {
+        if (!section.includes(snippet)) {
+          issues.push({
+            file: filePath,
+            message: `Section ${rule.heading} is missing required snippet: ${snippet}`
+          });
+        }
+      }
+
+      for (const pattern of rule.requiredPatterns ?? []) {
+        const regex = this.compilePattern(pattern);
+        if (!regex.test(section)) {
+          issues.push({
+            file: filePath,
+            message: `Section ${rule.heading} is missing required pattern: ${pattern}`
+          });
+        }
+      }
+
+      for (const pattern of rule.forbiddenPatterns ?? []) {
+        const regex = this.compilePattern(pattern);
+        if (regex.test(section)) {
+          issues.push({
+            file: filePath,
+            message: `Section ${rule.heading} contains forbidden pattern: ${pattern}`
+          });
+        }
+      }
+    }
+  }
+
+  private extractSection(content: string, heading: string): string | null {
+    const headingRegex = new RegExp(
+      `^(#{2,6})\\s+${this.escapeRegex(heading)}\\s*$`,
+      "m"
+    );
+    const match = headingRegex.exec(content);
+    if (!match || match.index === undefined) {
+      return null;
+    }
+
+    const level = match[1].length;
+    const sectionStart = match.index + match[0].length;
+    const rest = content.slice(sectionStart);
+    const nextHeadingRegex = new RegExp(`^#{1,${level}}\\s+`, "m");
+    const nextMatch = nextHeadingRegex.exec(rest);
+    const sectionEnd =
+      nextMatch && nextMatch.index !== undefined
+        ? sectionStart + nextMatch.index
+        : content.length;
+
+    return content.slice(match.index, sectionEnd).trim();
+  }
+
+  private extractLabeledBlock(
+    section: string,
+    label: (typeof EVIDENCE_LABELS)[number]
+  ): { content: string; paths: string[] } | null {
+    const currentIndex = EVIDENCE_LABELS.indexOf(label);
+    const nextLabels = EVIDENCE_LABELS.slice(currentIndex + 1);
+    const nextPattern =
+      nextLabels.length > 0
+        ? `(?=^(${nextLabels.map((item) => this.escapeRegex(item)).join("|")})[：:])`
+        : "(?=$)";
+    const regex = new RegExp(
+      `^${this.escapeRegex(label)}[：:]\\s*\\n([\\s\\S]*?)${nextPattern}`,
+      "m"
+    );
+    const match = regex.exec(section);
+    if (!match) {
+      return null;
+    }
+
+    const content = match[1].trim();
+    const paths = Array.from(content.matchAll(/`([^`\r\n]+)`/g)).map((item) => item[1]);
+    return { content, paths };
+  }
+
+  private compilePattern(pattern: string): RegExp {
+    const flags = new Set<string>(["m"]);
+    let source = pattern;
+
+    const inlineFlags = source.match(/^\(\?([ims]+)\)/);
+    if (inlineFlags) {
+      source = source.slice(inlineFlags[0].length);
+      for (const flag of inlineFlags[1]) {
+        flags.add(flag);
+      }
+    }
+
+    return new RegExp(source, [...flags].join(""));
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+}

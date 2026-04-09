@@ -1,5 +1,9 @@
 import * as path from "node:path";
-import { INIT_MARKERS, OSPEC_LITE_DIR } from "../core/ospec-lite-schema";
+import {
+  AUTHORING_PACK_FILES,
+  INIT_MARKERS,
+  OSPEC_LITE_DIR
+} from "../core/ospec-lite-schema";
 import { OSpecLiteConfig, StatusReport } from "../core/ospec-lite-types";
 import { FileRepo } from "../fs/file-repo";
 
@@ -11,9 +15,13 @@ export class StatusService {
     const indexPath = path.join(rootDir, OSPEC_LITE_DIR, "index.json");
     const hasBootstrapArtifacts =
       (await this.repo.exists(configPath)) || (await this.repo.exists(indexPath));
+    const config =
+      statefulConfigRequired(hasBootstrapArtifacts, await this.repo.exists(configPath))
+        ? await this.tryReadConfig(configPath)
+        : null;
 
     const missingMarkers: string[] = [];
-    for (const marker of INIT_MARKERS) {
+    for (const marker of this.getExpectedMarkers(config?.authoringPackRoot)) {
       if (!(await this.repo.exists(path.join(rootDir, marker)))) {
         missingMarkers.push(marker);
       }
@@ -26,11 +34,6 @@ export class StatusService {
           ? "initialized"
           : "incomplete";
 
-    const config =
-      state !== "uninitialized" && (await this.repo.exists(configPath))
-        ? await this.repo.readJson<OSpecLiteConfig>(configPath)
-        : null;
-
     return {
       state,
       missingMarkers,
@@ -38,6 +41,27 @@ export class StatusService {
       activeChanges: await this.listChangeNames(path.join(rootDir, "changes", "active")),
       archivedChanges: await this.listArchivedChangeNames(path.join(rootDir, "changes", "archived"))
     };
+  }
+
+  private async tryReadConfig(configPath: string): Promise<OSpecLiteConfig | null> {
+    try {
+      return await this.repo.readJson<OSpecLiteConfig>(configPath);
+    } catch {
+      return null;
+    }
+  }
+
+  private getExpectedMarkers(authoringPackRoot?: string): string[] {
+    if (!authoringPackRoot) {
+      return [...INIT_MARKERS];
+    }
+
+    return [
+      ...INIT_MARKERS,
+      ...AUTHORING_PACK_FILES.map((fileName) =>
+        path.join(authoringPackRoot, fileName).replace(/\\/g, "/")
+      )
+    ];
   }
 
   private async listChangeNames(dirPath: string): Promise<string[]> {
@@ -76,4 +100,11 @@ export class StatusService {
     }
     return result.sort((left, right) => left.localeCompare(right));
   }
+}
+
+function statefulConfigRequired(
+  hasBootstrapArtifacts: boolean,
+  hasConfigFile: boolean
+): boolean {
+  return hasBootstrapArtifacts && hasConfigFile;
 }

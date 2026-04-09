@@ -17,7 +17,17 @@ export const INIT_MARKERS = [
   "changes/archived"
 ] as const;
 
+export const AUTHORING_PACK_FILES = [
+  "doc-contract.md",
+  "project-brief.md",
+  "repo-reading-checklist.md",
+  "evidence-map.md",
+  "fill-project-docs.md",
+  "doc-task-checklist.json"
+] as const;
+
 export const DEFAULT_DOCUMENT_LANGUAGE = "en-US" as const;
+export const DEFAULT_AUTHORING_PACK_ROOT = "docs/agents/authoring" as const;
 
 export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
