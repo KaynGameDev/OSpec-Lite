@@ -254,6 +254,68 @@ test("init captures common repo signals from lowercase working directories", asy
   assert.equal(index.signals.hasAssetsDir, true);
 });
 
+test("scan harvests multilingual rules from rule sections and directive bullets", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-rules-");
+  await seedRepo(rootDir);
+
+  await fs.writeFile(
+    path.join(rootDir, "AGENTS.md"),
+    [
+      "# Agent Guide",
+      "",
+      "## Hard Rules",
+      "",
+      "- 必须先阅读 Script/MJGame.lua",
+      "- 不要修改自动生成文件",
+      "",
+      "## Notes",
+      "",
+      "- 先完成 evidence-map.md",
+      "- 这是普通说明，不是规则",
+      "- Avoid changing generated bindings without evidence.",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  await fs.writeFile(
+    path.join(rootDir, "CLAUDE.md"),
+    [
+      "# Claude Code Project Memory",
+      "",
+      "## 关键写作规则",
+      "",
+      "- 应该先核对入口文件",
+      "- 必须先阅读 Script/MJGame.lua",
+      "",
+      "## Notes",
+      "",
+      "- This area describes the repo layout.",
+      "- should update docs when conventions change",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+
+  const scan = await new ScanService(new FileRepo()).scan(rootDir);
+  const harvested = scan.rules
+    .filter((rule) => rule.source === "harvested")
+    .map((rule) => rule.text);
+
+  assert.deepEqual(harvested, [
+    "必须先阅读 Script/MJGame.lua",
+    "不要修改自动生成文件",
+    "应该先核对入口文件",
+    "先完成 evidence-map.md",
+    "Avoid changing generated bindings without evidence.",
+    "should update docs when conventions change"
+  ]);
+  assert.doesNotMatch(harvested.join("\n"), /这是普通说明，不是规则/);
+  assert.equal(
+    harvested.filter((rule) => rule === "必须先阅读 Script/MJGame.lua").length,
+    1
+  );
+});
+
 test("init patches existing AGENTS.md and CLAUDE.md without removing human content", async (t) => {
   const rootDir = await createTempRepo(t, "ospec-lite-agent-patch-");
   await seedRepo(rootDir);

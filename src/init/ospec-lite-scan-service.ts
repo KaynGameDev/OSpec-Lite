@@ -48,6 +48,12 @@ const ENTRYPOINT_BASENAMES = new Set([
 ]);
 
 const ENTRYPOINT_KEYWORDS = ["entry", "bootstrap", "start", "main", "game"];
+const RULE_SECTION_HEADINGS = new Set(["Hard Rules", "关键写作规则"]);
+const DIRECTIVE_RULE_PATTERNS = [
+  /\b(?:must|never|should|required|avoid)\b/i,
+  /必须|不要|禁止|避免|应当|应该|不得|先读|先完成/
+];
+const MAX_HARVESTED_RULES = 6;
 
 export class ScanService {
   constructor(private readonly repo: FileRepo) {}
@@ -110,6 +116,7 @@ export class ScanService {
       text,
       source: "default"
     }));
+    const contents: string[] = [];
 
     for (const fileName of ["AGENTS.md", "CLAUDE.md"]) {
       const filePath = path.join(rootDir, fileName);
@@ -117,24 +124,130 @@ export class ScanService {
         continue;
       }
 
-      const content = await this.repo.readText(filePath);
-      const harvested = content
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.startsWith("- "))
-        .filter((line) => /(must|never|should|required|avoid)/i.test(line))
-        .slice(0, 6);
+      contents.push(await this.repo.readText(filePath));
+    }
 
-      for (const line of harvested) {
-        rules.push({
-          id: `harvested-${rules.length + 1}`,
-          text: line.replace(/^- /, ""),
-          source: "harvested"
-        });
-      }
+    for (const text of this.collectHarvestedRuleTexts(contents)) {
+      rules.push({
+        id: `harvested-${rules.length + 1}`,
+        text,
+        source: "harvested"
+      });
     }
 
     return this.uniqueRules(rules);
+  }
+
+  private collectHarvestedRuleTexts(contents: string[]): string[] {
+    const sectionCandidates: string[] = [];
+    const sectionKeys = new Set<string>();
+    const fallbackCandidates: string[] = [];
+
+    for (const content of contents) {
+      for (const text of this.collectRuleSectionBullets(content)) {
+        sectionCandidates.push(text);
+        sectionKeys.add(this.toRuleKey(text));
+      }
+    }
+
+    for (const content of contents) {
+      for (const text of this.collectBulletLines(content)) {
+        if (sectionKeys.has(this.toRuleKey(text))) {
+          continue;
+        }
+        if (this.isDirectiveRule(text)) {
+          fallbackCandidates.push(text);
+        }
+      }
+    }
+
+    return this.takeUniqueRules(sectionCandidates, fallbackCandidates);
+  }
+
+  private takeUniqueRules(...groups: string[][]): string[] {
+    const harvested: string[] = [];
+    const seen = new Set<string>();
+
+    for (const group of groups) {
+      for (const text of group) {
+        const key = this.toRuleKey(text);
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        harvested.push(text);
+        if (harvested.length === MAX_HARVESTED_RULES) {
+          return harvested;
+        }
+      }
+    }
+
+    return harvested;
+  }
+
+  private collectRuleSectionBullets(content: string): string[] {
+    const bullets: string[] = [];
+
+    for (const sectionBody of this.extractRuleSectionBodies(content)) {
+      bullets.push(...this.collectBulletLines(sectionBody));
+    }
+
+    return bullets;
+  }
+
+  private extractRuleSectionBodies(content: string): string[] {
+    const lines = content.split(/\r?\n/);
+    const sections: string[] = [];
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const heading = this.parseHeading(lines[index]);
+      if (!heading || !RULE_SECTION_HEADINGS.has(heading.title)) {
+        continue;
+      }
+
+      let endIndex = lines.length;
+      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+        const nextHeading = this.parseHeading(lines[cursor]);
+        if (nextHeading && nextHeading.level <= heading.level) {
+          endIndex = cursor;
+          break;
+        }
+      }
+
+      sections.push(lines.slice(index + 1, endIndex).join("\n"));
+      index = endIndex - 1;
+    }
+
+    return sections;
+  }
+
+  private parseHeading(line: string): { level: number; title: string } | null {
+    const match = /^\s*(#{1,6})\s+(.*?)\s*$/.exec(line);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      level: match[1].length,
+      title: match[2].trim()
+    };
+  }
+
+  private collectBulletLines(content: string): string[] {
+    return content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("- "))
+      .map((line) => line.slice(2).trim())
+      .filter(Boolean);
+  }
+
+  private isDirectiveRule(text: string): boolean {
+    return DIRECTIVE_RULE_PATTERNS.some((pattern) => pattern.test(text));
+  }
+
+  private toRuleKey(text: string): string {
+    return text.toLowerCase();
   }
 
   private uniqueRules(rules: RuleItem[]): RuleItem[] {
