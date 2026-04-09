@@ -91,12 +91,14 @@ Example already-initialized log:
 
 ```text
 OSpec Lite: repository already initialized
+Path: /path/to/repo
+Config: .oslite/config.json
 Agent targets: codex, claude-code
 Agent entry files:
-- AGENTS.md
-- CLAUDE.md
-Project docs: docs/project/
-Changes root: changes/
+- codex: AGENTS.md
+- claude-code: CLAUDE.md
+Project docs: docs/project
+Changes root: changes
 ```
 
 ## Ownership Model
@@ -507,11 +509,13 @@ Suggested output:
 ```text
 OSpec Lite Status
 Initialized: yes
+State: initialized
 Agent targets: codex, claude-code
 Agent entry files:
-- AGENTS.md
-- CLAUDE.md
-Project docs: docs/project/
+- codex: AGENTS.md
+- claude-code: CLAUDE.md
+Project docs: docs/project
+Changes root: changes
 Active changes: 1
 Archived changes: 4
 ```
@@ -548,8 +552,6 @@ src/
     ospec-lite-change-service.ts
     ospec-lite-change-template-service.ts
     templates/
-    archive-service.ts
-    verify-service.ts
   status/
     ospec-lite-status-service.ts
 ```

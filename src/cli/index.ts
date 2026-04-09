@@ -46,9 +46,19 @@ async function handleInit(args: string[]): Promise<void> {
   const before = await initService.getInitState(targetDir);
 
   if (before.state === "initialized") {
+    const status = await statusService.getStatus(targetDir);
     console.log("OSpec Lite: repository already initialized");
     console.log(`Path: ${targetDir}`);
     console.log(`Config: ${path.relative(targetDir, before.configPath).replace(/\\/g, "/")}`);
+    if (isCompleteStatusConfig(status.config)) {
+      console.log(`Agent targets: ${status.config.agentTargets.join(", ")}`);
+      console.log("Agent entry files:");
+      for (const [target, fileName] of Object.entries(status.config.agentEntryFiles)) {
+        console.log(`- ${target}: ${fileName}`);
+      }
+      console.log(`Project docs: ${status.config.projectDocsRoot}`);
+      console.log(`Changes root: ${status.config.changeRoot}`);
+    }
     return;
   }
 

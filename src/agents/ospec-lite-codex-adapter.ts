@@ -19,7 +19,7 @@ export class CodexAdapter implements AgentAdapter {
     importantFiles: string[];
   }) {
     const hardRules = input.rules.map((rule) => `- ${rule}`).join("\n");
-    const fileLines = input.importantFiles
+    const highRiskAreas = input.importantFiles
       .slice(0, 5)
       .map((filePath) => `- \`${filePath}\``)
       .join("\n");
@@ -31,7 +31,7 @@ export class CodexAdapter implements AgentAdapter {
       docsRoot: input.docsRoot,
       agentDocsRoot: input.agentDocsRoot,
       hardRules,
-      highValueFiles: fileLines || "- Review the project docs first."
+      highRiskAreas: highRiskAreas || "- Review the project docs first."
     });
 
     return {

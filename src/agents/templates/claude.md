@@ -1,6 +1,8 @@
 # Claude Code Project Memory
 
 {{managedStart}}
+## Shared Instructions Import
+
 @AGENTS.md
 
 ## Claude Code Notes

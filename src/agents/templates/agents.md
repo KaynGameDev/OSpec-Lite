@@ -12,9 +12,9 @@
 
 {{hardRules}}
 
-### High-Value Files
+### High-Risk Areas
 
-{{highValueFiles}}
+{{highRiskAreas}}
 
 ### Read Next
 

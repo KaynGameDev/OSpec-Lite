@@ -77,6 +77,12 @@ test("cli init is one-shot and preserves human edits on rerun", async (t) => {
   const second = runCli(["init", rootDir]);
   assert.equal(second.status, 0, second.stderr);
   assert.match(second.stdout, /already initialized/i);
+  assert.match(second.stdout, /Agent targets: codex, claude-code/);
+  assert.match(second.stdout, /Agent entry files:/);
+  assert.match(second.stdout, /- codex: AGENTS\.md/);
+  assert.match(second.stdout, /- claude-code: CLAUDE\.md/);
+  assert.match(second.stdout, /Project docs: docs\/project/);
+  assert.match(second.stdout, /Changes root: changes/);
 
   const after = await fs.readFile(overviewPath, "utf8");
   assert.equal(after, customOverview);
@@ -349,12 +355,14 @@ test("agent entry patching replaces managed sections instead of duplicating them
   assert.match(codexSection.content, /^# Agent Guide/m);
   assert.match(codexSection.content, new RegExp(escapeRegex(AGENTS_MANAGED_START)));
   assert.match(codexSection.content, /Updated summary for AGENTS\./);
+  assert.match(codexSection.content, /### High-Risk Areas/);
   assert.match(codexSection.content, /Use the managed AGENTS block\./);
   assert.match(codexSection.content, /- `AGENTS\.md`/);
   assert.match(codexSection.content, /- `docs\/project\/overview\.md`/);
 
   assert.match(claudeSection.content, /^# Claude Code Project Memory/m);
   assert.match(claudeSection.content, new RegExp(escapeRegex(CLAUDE_MANAGED_START)));
+  assert.match(claudeSection.content, /## Shared Instructions Import/);
   assert.match(claudeSection.content, /@AGENTS\.md/);
   assert.match(claudeSection.content, /Updated summary for CLAUDE\./);
   assert.match(claudeSection.content, /Use @docs\/agents\/quickstart\.md for quick orientation\./);
