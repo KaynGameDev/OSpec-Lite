@@ -4,6 +4,15 @@
 
 它的目标不是直接写死项目事实，而是把仓库初始化成一个更适合 Codex / Claude Code 读库、补文档、做 code review 的工作流。
 
+## 适用团队
+
+这个 profile 是专门给 Unity 子游戏项目组使用的。
+
+更具体地说，它面向的是：
+- 使用 Unity + ToLua 的子游戏仓库
+- 需要让 Codex / Claude Code 更快建立读库心智模型的项目组
+- 希望把“初始化 -> 证据整理 -> 项目文档补全 -> verify”串成固定工作流的团队
+
 ## 适用场景
 
 适用于满足以下条件的仓库：
@@ -24,6 +33,28 @@
 ```text
 Help me use the unity-tolua-game profile to init ospec-lite. If the repo is not initialized yet, infer the project name and ask me to confirm it first. Then fill evidence-map before the final docs, and finish with oslite docs verify.
 ```
+
+## 在 Codex / Claude Code 中怎么用
+
+推荐项目先安装本地依赖：
+
+```powershell
+npm.cmd install --save-dev ospec-lite@0.1.0
+```
+
+安装完成后，子游戏项目组成员不需要手动拆命令，直接在 Codex 或 Claude Code 里说下面这句即可：
+
+```text
+帮我用 unity-tolua-game 的 profile 去 init ospec-lite；如果还没初始化，请先推断项目名并向我确认。然后先补 evidence-map，再补正式项目文档，最后跑 oslite docs verify。
+```
+
+默认预期是 agent 自己完成这些步骤：
+1. 判断仓库是否已经完成 `unity-tolua-game` 初始化
+2. 如未初始化，先推断项目名并向用户确认
+3. 运行 `oslite init --profile unity-tolua-game ...`
+4. 先补 `docs/agents/authoring/evidence-map.md`
+5. 再补 `AGENTS.md`、`CLAUDE.md`、`docs/project/*`、`docs/agents/*`
+6. 最后运行 `oslite docs verify .`
 
 ## Agent 预期行为
 
