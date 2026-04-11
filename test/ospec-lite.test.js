@@ -543,6 +543,40 @@ test("archive rejects changes that are not verified", async (t) => {
   assert.equal(await repo.exists(changeDir), true);
 });
 
+test("archive preserves verified status when move to archived path fails", async (t) => {
+  const rootDir = await createTempRepo(t, "ospec-lite-archive-move-failure-");
+  await seedRepo(rootDir);
+
+  const { repo, initService, changeService } = createServices();
+  await initService.init(rootDir, { documentLanguage: "en-US" });
+
+  const slug = "archive-conflict";
+  const changeDir = await changeService.newChange(rootDir, slug);
+  await changeService.markApplied(changeDir);
+  await changeService.markVerified(changeDir);
+
+  const now = new Date();
+  const month = now.toISOString().slice(0, 7);
+  const day = now.toISOString().slice(0, 10);
+  const archiveDir = path.join(
+    rootDir,
+    ".oslite",
+    "changes",
+    "archived",
+    month,
+    day,
+    slug
+  );
+  await fs.mkdir(archiveDir, { recursive: true });
+  await fs.writeFile(path.join(archiveDir, "occupied.txt"), "conflict\n", "utf8");
+
+  await assert.rejects(() => changeService.archive(changeDir));
+
+  const activeRecord = await repo.readJson(path.join(changeDir, "change.json"));
+  assert.equal(activeRecord.status, "verified");
+  assert.equal(await repo.exists(changeDir), true);
+});
+
 function createServices() {
   const repo = new FileRepo();
   const scanService = new ScanService(repo);

@@ -71,11 +71,14 @@ export class ChangeService {
     const month = now.toISOString().slice(0, 7);
     const day = now.toISOString().slice(0, 10);
     const archiveDir = path.join(rootDir, OSPEC_LITE_DIR, "changes", "archived", month, day, record.slug);
+    const archivedRecord: ChangeRecord = {
+      ...record,
+      status: "archived",
+      updatedAt: now.toISOString()
+    };
 
-    record.status = "archived";
-    record.updatedAt = now.toISOString();
-    await this.repo.writeJson(path.join(changePath, "change.json"), record);
     await this.repo.move(changePath, archiveDir);
+    await this.repo.writeJson(path.join(archiveDir, "change.json"), archivedRecord);
     return archiveDir;
   }
 
