@@ -50,7 +50,7 @@ test("init bootstraps the repository knowledge layer", async (t) => {
 
   const agents = await repo.readText(path.join(rootDir, "AGENTS.md"));
   const claude = await repo.readText(path.join(rootDir, "CLAUDE.md"));
-  const overview = await repo.readText(path.join(rootDir, "docs", "project", "overview.md"));
+  const overview = await repo.readText(path.join(rootDir, ".oslite", "docs", "project", "overview.md"));
 
   assert.match(overview, /Project Overview/);
   assert.ok(agents.includes(AGENTS_MANAGED_START));
@@ -71,7 +71,7 @@ test("cli init is one-shot and preserves human edits on rerun", async (t) => {
   assert.equal(first.status, 0, first.stderr);
   assert.match(first.stdout, /repository initialized/i);
 
-  const overviewPath = path.join(rootDir, "docs", "project", "overview.md");
+  const overviewPath = path.join(rootDir, ".oslite", "docs", "project", "overview.md");
   const customOverview = "# Custom Overview\n\nThis file was edited by a human.\n";
   await fs.writeFile(overviewPath, customOverview, "utf8");
 
@@ -82,8 +82,8 @@ test("cli init is one-shot and preserves human edits on rerun", async (t) => {
   assert.match(second.stdout, /Agent entry files:/);
   assert.match(second.stdout, /- codex: AGENTS\.md/);
   assert.match(second.stdout, /- claude-code: CLAUDE\.md/);
-  assert.match(second.stdout, /Project docs: docs\/project/);
-  assert.match(second.stdout, /Changes root: changes/);
+  assert.match(second.stdout, /Project docs: \.oslite\/docs\/project/);
+  assert.match(second.stdout, /Changes root: \.oslite\/changes/);
 
   const after = await fs.readFile(overviewPath, "utf8");
   assert.equal(after, customOverview);
@@ -187,8 +187,8 @@ test("cli status reports initialized repositories with config details", async (t
   assert.match(result.stdout, /Initialized: yes/);
   assert.match(result.stdout, /State: initialized/);
   assert.match(result.stdout, /Agent targets: codex, claude-code/);
-  assert.match(result.stdout, /Project docs: docs\/project/);
-  assert.match(result.stdout, /Changes root: changes/);
+  assert.match(result.stdout, /Project docs: \.oslite\/docs\/project/);
+  assert.match(result.stdout, /Changes root: \.oslite\/changes/);
   assert.match(result.stdout, /Active changes: 1/);
   assert.match(result.stdout, /Archived changes: 0/);
 });
@@ -403,18 +403,18 @@ test("agent entry patching replaces managed sections instead of duplicating them
   const codexSection = codexAdapter.buildSection({
     projectName: "Managed Update Repo",
     summary: "Updated summary for AGENTS.",
-    docsRoot: "docs/project",
-    agentDocsRoot: "docs/agents",
+    docsRoot: ".oslite/docs/project",
+    agentDocsRoot: ".oslite/docs/agents",
     rules: ["Use the managed AGENTS block."],
-    importantFiles: ["AGENTS.md", "docs/project/overview.md"]
+    importantFiles: ["AGENTS.md", ".oslite/docs/project/overview.md"]
   });
   const claudeSection = claudeAdapter.buildSection({
     projectName: "Managed Update Repo",
     summary: "Updated summary for CLAUDE.",
-    docsRoot: "docs/project",
-    agentDocsRoot: "docs/agents",
+    docsRoot: ".oslite/docs/project",
+    agentDocsRoot: ".oslite/docs/agents",
     rules: ["Use the managed CLAUDE block."],
-    importantFiles: ["CLAUDE.md", "docs/project/overview.md"]
+    importantFiles: ["CLAUDE.md", ".oslite/docs/project/overview.md"]
   });
 
   assert.match(codexSection.content, /^# Agent Guide/m);
@@ -423,14 +423,14 @@ test("agent entry patching replaces managed sections instead of duplicating them
   assert.match(codexSection.content, /### High-Risk Areas/);
   assert.match(codexSection.content, /Use the managed AGENTS block\./);
   assert.match(codexSection.content, /- `AGENTS\.md`/);
-  assert.match(codexSection.content, /- `docs\/project\/overview\.md`/);
+  assert.match(codexSection.content, /- `\.oslite\/docs\/project\/overview\.md`/);
 
   assert.match(claudeSection.content, /^# Claude Code Project Memory/m);
   assert.match(claudeSection.content, new RegExp(escapeRegex(CLAUDE_MANAGED_START)));
   assert.match(claudeSection.content, /## Shared Instructions Import/);
   assert.match(claudeSection.content, /@AGENTS\.md/);
   assert.match(claudeSection.content, /Updated summary for CLAUDE\./);
-  assert.match(claudeSection.content, /Use @docs\/agents\/quickstart\.md for quick orientation\./);
+  assert.match(claudeSection.content, /Use @\.oslite\/docs\/agents\/quickstart\.md for quick orientation\./);
 
   await agentEntries.ensureManagedSection(
     rootDir,

@@ -31,14 +31,14 @@ test("profile init succeeds non-interactively when project name and bootstrap ag
   assert.equal(config.profileId, "unity-tolua-game");
   assert.equal(config.projectName, "Test Unity ToLua Repo");
   assert.equal(config.bootstrapAgent, "none");
-  assert.equal(config.authoringPackRoot, "docs/agents/authoring");
+  assert.equal(config.authoringPackRoot, ".oslite/docs/agents/authoring");
   assert.deepEqual(config.agentWrapperFiles, {
     codex: [".codex/skills/oslite-fill-project-docs/SKILL.md"],
     "claude-code": [".claude/commands/oslite-fill-project-docs.md"]
   });
 
   const brief = await fs.readFile(
-    path.join(rootDir, "docs", "agents", "authoring", "project-brief.md"),
+    path.join(rootDir, ".oslite", "docs", "agents", "authoring", "project-brief.md"),
     "utf8"
   );
   assert.match(brief, /Test Unity ToLua Repo/);
@@ -46,12 +46,12 @@ test("profile init succeeds non-interactively when project name and bootstrap ag
   assert.doesNotMatch(brief, /\{\{projectName\}\}/);
 
   for (const relativePath of [
-    "docs/agents/authoring/doc-contract.md",
-    "docs/agents/authoring/project-brief.md",
-    "docs/agents/authoring/repo-reading-checklist.md",
-    "docs/agents/authoring/evidence-map.md",
-    "docs/agents/authoring/fill-project-docs.md",
-    "docs/agents/authoring/doc-task-checklist.json",
+    ".oslite/docs/agents/authoring/doc-contract.md",
+    ".oslite/docs/agents/authoring/project-brief.md",
+    ".oslite/docs/agents/authoring/repo-reading-checklist.md",
+    ".oslite/docs/agents/authoring/evidence-map.md",
+    ".oslite/docs/agents/authoring/fill-project-docs.md",
+    ".oslite/docs/agents/authoring/doc-task-checklist.json",
     ".codex/skills/oslite-fill-project-docs/SKILL.md",
     ".claude/commands/oslite-fill-project-docs.md"
   ]) {
@@ -63,7 +63,7 @@ test("profile init succeeds non-interactively when project name and bootstrap ag
   assert.match(statusResult.stdout, /Project: Test Unity ToLua Repo/);
   assert.match(statusResult.stdout, /Profile: unity-tolua-game/);
   assert.match(statusResult.stdout, /Bootstrap agent: none/);
-  assert.match(statusResult.stdout, /Authoring pack: docs\/agents\/authoring/);
+  assert.match(statusResult.stdout, /Authoring pack: \.oslite\/docs\/agents\/authoring/);
   assert.match(statusResult.stdout, /Agent wrappers:/);
   assert.match(
     statusResult.stdout,
@@ -365,11 +365,11 @@ test("docs verify fails when project brief is missing", async (t) => {
 
   runProfileInit(rootDir, { projectName: "Brief Missing Repo", bootstrapAgent: "none" });
   await makeProfileDocsCompliant(rootDir);
-  await fs.rm(path.join(rootDir, "docs", "agents", "authoring", "project-brief.md"));
+  await fs.rm(path.join(rootDir, ".oslite", "docs", "agents", "authoring", "project-brief.md"));
 
   const verifyResult = runCli(["docs", "verify", rootDir]);
   assert.equal(verifyResult.status, 1);
-  assert.match(verifyResult.stderr, /Missing authoring pack file: docs\/agents\/authoring\/project-brief\.md/);
+  assert.match(verifyResult.stderr, /Missing authoring pack file: \.oslite\/docs\/agents\/authoring\/project-brief\.md/);
 });
 
 test("docs verify fails when evidence map is missing", async (t) => {
@@ -378,11 +378,11 @@ test("docs verify fails when evidence map is missing", async (t) => {
 
   runProfileInit(rootDir, { projectName: "Evidence Missing Repo", bootstrapAgent: "none" });
   await makeProfileDocsCompliant(rootDir);
-  await fs.rm(path.join(rootDir, "docs", "agents", "authoring", "evidence-map.md"));
+  await fs.rm(path.join(rootDir, ".oslite", "docs", "agents", "authoring", "evidence-map.md"));
 
   const verifyResult = runCli(["docs", "verify", rootDir]);
   assert.equal(verifyResult.status, 1);
-  assert.match(verifyResult.stderr, /Missing authoring pack file: docs\/agents\/authoring\/evidence-map\.md/);
+  assert.match(verifyResult.stderr, /Missing authoring pack file: \.oslite\/docs\/agents\/authoring\/evidence-map\.md/);
 });
 
 test("docs verify fails when evidence map sections are incomplete", async (t) => {
@@ -391,7 +391,7 @@ test("docs verify fails when evidence map sections are incomplete", async (t) =>
 
   runProfileInit(rootDir, { projectName: "Evidence Sections Repo", bootstrapAgent: "none" });
   await makeProfileDocsCompliant(rootDir);
-  await rewriteFile(rootDir, "docs/agents/authoring/evidence-map.md", (content) =>
+  await rewriteFile(rootDir, ".oslite/docs/agents/authoring/evidence-map.md", (content) =>
     content.replace("## 网络入口", "## 网络")
   );
 
@@ -406,10 +406,10 @@ test("docs verify fails when final docs miss headings or evidence labels", async
 
   runProfileInit(rootDir, { projectName: "Final Docs Repo", bootstrapAgent: "none" });
   await makeProfileDocsCompliant(rootDir);
-  await rewriteFile(rootDir, "docs/project/overview.md", (content) =>
+  await rewriteFile(rootDir, ".oslite/docs/project/overview.md", (content) =>
     content.replace("## 主流程", "## 流程")
   );
-  await rewriteFile(rootDir, "docs/project/entrypoints.md", (content) =>
+  await rewriteFile(rootDir, ".oslite/docs/project/entrypoints.md", (content) =>
     content.replace("证据文件：", "相关文件：")
   );
 
@@ -425,7 +425,7 @@ test("docs verify reports missing evidence paths clearly", async (t) => {
 
   runProfileInit(rootDir, { projectName: "Missing Path Repo", bootstrapAgent: "none" });
   await makeProfileDocsCompliant(rootDir);
-  await rewriteFile(rootDir, "docs/project/architecture.md", (content) =>
+  await rewriteFile(rootDir, ".oslite/docs/project/architecture.md", (content) =>
     content.replace(
       "证据文件：\n- `Script/MJGame.lua`",
       "证据文件：\n- `Script/DoesNotExist.lua`"
@@ -446,7 +446,7 @@ test("docs verify blocks forbidden Editor scope expansion", async (t) => {
 
   runProfileInit(rootDir, { projectName: "Editor Scope Repo", bootstrapAgent: "none" });
   await makeProfileDocsCompliant(rootDir);
-  await rewriteFile(rootDir, "docs/project/overview.md", (content) =>
+  await rewriteFile(rootDir, ".oslite/docs/project/overview.md", (content) =>
     `${content}\n\n## Editor\n- 这里不应展开 Editor。\n`
   );
 
@@ -461,7 +461,7 @@ test("docs verify fails when startup entry does not reference Script/MJGame.lua"
 
   runProfileInit(rootDir, { projectName: "MJGame Rule Repo", bootstrapAgent: "none" });
   await makeProfileDocsCompliant(rootDir);
-  await rewriteFile(rootDir, "docs/project/entrypoints.md", (content) =>
+  await rewriteFile(rootDir, ".oslite/docs/project/entrypoints.md", (content) =>
     content.replaceAll("`Script/MJGame.lua`", "`Script/OtherEntry.lua`")
   );
 
@@ -488,7 +488,7 @@ test("docs verify passes on a compliant unity-tolua fixture", async (t) => {
   assert.equal(verifyResult.status, 0, verifyResult.stderr);
   assert.match(verifyResult.stdout, /docs verification passed/i);
   assert.match(verifyResult.stdout, /Profile: unity-tolua-game/);
-  assert.match(verifyResult.stdout, /docs\/project\/entrypoints\.md/);
+  assert.match(verifyResult.stdout, /\.oslite\/docs\/project\/entrypoints\.md/);
 });
 
 async function createTempRepo(t, prefix) {
@@ -538,15 +538,15 @@ async function seedUnityToLuaRepo(rootDir, options = {}) {
 
 async function makeProfileDocsCompliant(rootDir) {
   const docPaths = [
-    "docs/project/overview.md",
-    "docs/project/architecture.md",
-    "docs/project/repo-map.md",
-    "docs/project/entrypoints.md",
-    "docs/project/glossary.md",
-    "docs/project/coding-rules.md",
-    "docs/agents/quickstart.md",
-    "docs/agents/change-playbook.md",
-    "docs/agents/authoring/evidence-map.md"
+    ".oslite/docs/project/overview.md",
+    ".oslite/docs/project/architecture.md",
+    ".oslite/docs/project/repo-map.md",
+    ".oslite/docs/project/entrypoints.md",
+    ".oslite/docs/project/glossary.md",
+    ".oslite/docs/project/coding-rules.md",
+    ".oslite/docs/agents/quickstart.md",
+    ".oslite/docs/agents/change-playbook.md",
+    ".oslite/docs/agents/authoring/evidence-map.md"
   ];
 
   for (const relativePath of docPaths) {

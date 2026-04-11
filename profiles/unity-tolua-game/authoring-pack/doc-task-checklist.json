@@ -48,7 +48,7 @@
       "requiredSnippets": [
         "@AGENTS.md",
         "@.oslite/docs/agents/authoring/fill-project-docs.md",
-        "@docs/agents/authoring/evidence-map.md"
+        "@.oslite/docs/agents/authoring/evidence-map.md"
       ]
     },
     {
