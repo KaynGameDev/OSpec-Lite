@@ -189,7 +189,7 @@ test("profile init rejects project-specific flags outside the unity-tolua profil
   assert.equal(initResult.status, 1);
   assert.match(
     initResult.stderr,
-    /--project-name and --bootstrap-agent are only supported with --profile unity-tolua-game/i
+    /--project-name and --bootstrap-agent are only supported with a profile that requires those init values/i
   );
 });
 

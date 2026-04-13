@@ -1,4 +1,5 @@
 export type DocumentLanguage = "en-US" | "zh-CN";
+export type ProfileInitField = "projectName" | "bootstrapAgent";
 
 export type AgentTarget = "codex" | "claude-code";
 export type BootstrapAgent = AgentTarget | "none";
@@ -127,6 +128,7 @@ export interface OSpecLiteProfile {
   authoringPackRoot: string;
   outputs: string[];
   assets: OSpecLiteProfileAsset[];
+  requiredInitFields?: ProfileInitField[];
   requiredRepoPaths?: string[];
   agentWrapperFiles?: Partial<Record<AgentTarget, string[]>>;
 }

@@ -11,6 +11,6 @@ A profile pack may provide:
 Profiles are assets, not executable plugins.
 
 Notes:
-- `unity-tolua-game` may ask for `projectName` and `bootstrapAgent` during init.
+- `unity-tolua-game` and `unity-tolua-hall` may ask for `projectName` and `bootstrapAgent` during init.
 - In non-interactive environments, that profile requires explicit init flags instead of prompts.
 - Team-facing usage guidance for that profile lives in [`unity-tolua-game/README.md`](./unity-tolua-game/README.md).

@@ -1,16 +1,19 @@
 {
   "version": 1,
-  "id": "unity-tolua-game",
-  "displayName": "Unity + ToLua Game",
-  "description": "Repo-local reading workflow and authoring pack for Unity + ToLua game repositories.",
-  "documentLanguage": "zh-CN",
+  "id": "unity-tolua-hall",
+  "displayName": "Unity + ToLua Hall",
+  "description": "Repo-local reading workflow and authoring pack for Unity + ToLua hall repositories.",
+  "documentLanguage": "en-US",
   "authoringPackRoot": ".oslite/docs/agents/authoring",
   "requiredInitFields": [
     "projectName",
     "bootstrapAgent"
   ],
   "requiredRepoPaths": [
-    "Script/MJGame.lua"
+    "Assets/_GameCenter/ClientLua/Main.lua",
+    "Assets/_GameCenter/FrameWork/Behaviours/Launch.cs",
+    "Assets/_GameCenter/LuaFramework/Scripts/Main.cs",
+    "Assets/_GameCenter/_Resources/HallScene/main.unity"
   ],
   "agentWrapperFiles": {
     "codex": [

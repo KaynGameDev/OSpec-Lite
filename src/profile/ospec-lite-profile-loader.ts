@@ -3,6 +3,7 @@ import {
   LoadedOSpecLiteProfile,
   OSpecLiteProfile,
   OSpecLiteProfileAsset,
+  ProfileInitField,
   ProfileTemplateValues
 } from "../core/ospec-lite-types";
 import { FileRepo } from "../fs/file-repo";
@@ -59,6 +60,15 @@ export class ProfileLoader {
       throw new InvalidProfileError(`Profile ${profile.id} does not define any assets.`);
     }
     if (
+      profile.requiredInitFields &&
+      (!Array.isArray(profile.requiredInitFields) ||
+        profile.requiredInitFields.some((field) => !this.isSupportedInitField(field)))
+    ) {
+      throw new InvalidProfileError(
+        `Profile ${profile.id} has invalid requiredInitFields declarations.`
+      );
+    }
+    if (
       profile.requiredRepoPaths &&
       (!Array.isArray(profile.requiredRepoPaths) ||
         profile.requiredRepoPaths.some((item) => typeof item !== "string" || item.length === 0))
@@ -87,5 +97,9 @@ export class ProfileLoader {
         );
       }
     }
+  }
+
+  private isSupportedInitField(value: unknown): value is ProfileInitField {
+    return value === "projectName" || value === "bootstrapAgent";
   }
 }

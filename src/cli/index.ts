@@ -24,8 +24,6 @@ import {
 import { ProfileLoader } from "../profile/ospec-lite-profile-loader";
 import { DocVerifierService } from "../docs/ospec-lite-doc-verifier-service";
 
-const UNITY_TOLUA_PROFILE_ID = "unity-tolua-game";
-
 const repo = new FileRepo();
 const scanService = new ScanService(repo);
 const renderer = new MarkdownRenderer();
@@ -496,20 +494,32 @@ async function resolveProfileInitAnswers(
   projectName?: string;
   bootstrapAgent?: BootstrapAgent;
 }> {
-  if (values.profileId !== UNITY_TOLUA_PROFILE_ID) {
+  if (!values.profileId) {
     if (values.projectName || values.bootstrapAgent) {
       throw new OSpecLiteError(
-        "--project-name and --bootstrap-agent are only supported with --profile unity-tolua-game."
+        "--project-name and --bootstrap-agent are only supported with a profile that requires those init values."
       );
     }
     return {};
   }
 
+  const profile = await profileLoader.loadProfile(values.profileId);
+  const requiredFields = new Set(profile.requiredInitFields ?? []);
+
+  if (requiredFields.size === 0) {
+    if (values.projectName || values.bootstrapAgent) {
+      throw new OSpecLiteError(
+        "--project-name and --bootstrap-agent are only supported with a profile that requires those init values."
+      );
+    }
+    return values;
+  }
+
   const missingFields: string[] = [];
-  if (!values.projectName) {
+  if (requiredFields.has("projectName") && !values.projectName) {
     missingFields.push("projectName");
   }
-  if (!values.bootstrapAgent) {
+  if (requiredFields.has("bootstrapAgent") && !values.bootstrapAgent) {
     missingFields.push("bootstrapAgent");
   }
 
@@ -528,15 +538,17 @@ async function resolveProfileInitAnswers(
   const prompter = await createInitPrompter();
 
   try {
-    const projectName =
-      values.projectName ??
-      (await prompter.ask("Project name", defaults.projectName));
-    const bootstrapAnswer =
-      values.bootstrapAgent ??
-      (await prompter.ask(
-        "Bootstrap agent (codex/claude-code/none)",
-        defaults.bootstrapAgent
-      ).then((answer) => parseBootstrapAgent(answer)));
+    const projectName = requiredFields.has("projectName")
+      ? values.projectName ??
+        (await prompter.ask("Project name", defaults.projectName))
+      : values.projectName;
+    const bootstrapAnswer = requiredFields.has("bootstrapAgent")
+      ? values.bootstrapAgent ??
+        (await prompter.ask(
+          "Bootstrap agent (codex/claude-code/none)",
+          defaults.bootstrapAgent
+        ).then((answer) => parseBootstrapAgent(answer)))
+      : values.bootstrapAgent;
 
     return {
       projectName,

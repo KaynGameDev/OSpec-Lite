@@ -19,8 +19,6 @@ import {
 } from "../core/ospec-lite-errors";
 import { FileRepo } from "../fs/file-repo";
 
-const EVIDENCE_LABELS = ["结论", "证据文件", "确认状态", "未确认点"] as const;
-
 export class DocVerifierService {
   constructor(private readonly repo: FileRepo) {}
 
@@ -205,6 +203,9 @@ export class DocVerifierService {
     content: string,
     issues: DocVerificationIssue[]
   ): Promise<void> {
+    const evidenceLabel = checklist.requiredEvidenceLabels[1];
+    const statusLabel = checklist.requiredEvidenceLabels[2];
+
     for (const heading of fileRule.evidenceSections ?? []) {
       const section = this.extractSection(content, heading);
       if (!section) {
@@ -216,7 +217,7 @@ export class DocVerifierService {
       }
 
       for (const label of checklist.requiredEvidenceLabels) {
-        const labelRegex = new RegExp(`${this.escapeRegex(label)}[：:]`, "m");
+        const labelRegex = new RegExp(`${this.escapeRegex(label)}[:：]`, "m");
         if (!labelRegex.test(section)) {
           issues.push({
             file: fileRule.path,
@@ -225,7 +226,9 @@ export class DocVerifierService {
         }
       }
 
-      const evidenceBlock = this.extractLabeledBlock(section, "证据文件");
+      const evidenceBlock = evidenceLabel
+        ? this.extractLabeledBlock(section, evidenceLabel, checklist.requiredEvidenceLabels)
+        : null;
       if (!evidenceBlock || evidenceBlock.paths.length === 0) {
         issues.push({
           file: fileRule.path,
@@ -242,11 +245,13 @@ export class DocVerifierService {
         }
       }
 
-      const statusBlock = this.extractLabeledBlock(section, "确认状态");
+      const statusBlock = statusLabel
+        ? this.extractLabeledBlock(section, statusLabel, checklist.requiredEvidenceLabels)
+        : null;
       if (!statusBlock) {
         issues.push({
           file: fileRule.path,
-          message: `Section ${heading} is missing 确认状态内容。`
+          message: `Section ${heading} is missing status content.`
         });
       } else if (
         !checklist.allowedStatuses.some((status) =>
@@ -335,16 +340,21 @@ export class DocVerifierService {
 
   private extractLabeledBlock(
     section: string,
-    label: (typeof EVIDENCE_LABELS)[number]
+    label: string,
+    labels: string[]
   ): { content: string; paths: string[] } | null {
-    const currentIndex = EVIDENCE_LABELS.indexOf(label);
-    const nextLabels = EVIDENCE_LABELS.slice(currentIndex + 1);
+    const currentIndex = labels.indexOf(label);
+    if (currentIndex < 0) {
+      return null;
+    }
+
+    const nextLabels = labels.slice(currentIndex + 1);
     const nextPattern =
       nextLabels.length > 0
-        ? `(?=^(${nextLabels.map((item) => this.escapeRegex(item)).join("|")})[：:])`
+        ? `(?=^(${nextLabels.map((item) => this.escapeRegex(item)).join("|")})[:：])`
         : "(?=$)";
     const regex = new RegExp(
-      `^${this.escapeRegex(label)}[：:]\\s*\\n([\\s\\S]*?)${nextPattern}`,
+      `^${this.escapeRegex(label)}[:：]\\s*\\n([\\s\\S]*?)${nextPattern}`,
       "m"
     );
     const match = regex.exec(section);

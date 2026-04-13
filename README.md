@@ -71,6 +71,8 @@ node ./dist/cli/index.js init ..
 node ./dist/cli/index.js init --document-language zh-CN ..
 node ./dist/cli/index.js init --profile unity-tolua-game ..
 node ./dist/cli/index.js init --profile unity-tolua-game --project-name "BuYuDaLuanDou" --bootstrap-agent codex ..
+node ./dist/cli/index.js init --profile unity-tolua-hall ..
+node ./dist/cli/index.js init --profile unity-tolua-hall --project-name "NeoHall" --bootstrap-agent codex ..
 node ./dist/cli/index.js status ..
 node ./dist/cli/index.js docs verify ..
 node ./dist/cli/index.js change new example-change ..
@@ -84,6 +86,7 @@ node ./dist/cli/index.js change new example-change ..
 
 - profiles live under [`profiles/`](./profiles)
 - the first content-only profile is [`unity-tolua-game`](./profiles/unity-tolua-game/profile.json)
+- a hall-oriented companion profile is [`unity-tolua-hall`](./profiles/unity-tolua-hall/profile.json)
 - profiles do not execute code or call hosted models
 - profiles provide:
   - neutral doc skeletons
@@ -98,4 +101,4 @@ node ./dist/cli/index.js change new example-change ..
 - V1 `init` is intentionally one-shot. If the repo is already initialized, it logs that state and exits.
 - V1 stays provider-agnostic. It prepares repo-local instructions for Codex and Claude Code, but does not orchestrate model calls directly.
 - The `unity-tolua-game` profile only hard-codes one project rule: `Script/MJGame.lua` is the main entry anchor.
-- `unity-tolua-game` can ask for `projectName` and `bootstrapAgent` during `init`; in non-interactive environments, pass `--project-name` and `--bootstrap-agent` explicitly.
+- `unity-tolua-game` and `unity-tolua-hall` can ask for `projectName` and `bootstrapAgent` during `init`; in non-interactive environments, pass `--project-name` and `--bootstrap-agent` explicitly.

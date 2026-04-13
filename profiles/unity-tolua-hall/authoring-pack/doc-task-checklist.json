@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "profileId": "unity-tolua-hall",
+  "placeholderPatterns": [
+    "TBD",
+    "(?m)^-\\s*$"
+  ],
+  "forbiddenPatterns": [
+    "(?m)^##\\s*Editor\\b",
+    "(?m)^###\\s*Editor\\b",
+    "(?m)^##\\s*Editor/",
+    "(?m)^###\\s*Editor/"
+  ],
+  "requiredEvidenceLabels": [
+    "Conclusion",
+    "Evidence Files",
+    "Status",
+    "Open Questions"
+  ],
+  "allowedStatuses": [
+    "Confirmed",
+    "Inferred",
+    "Pending"
+  ],
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "requiredHeadings": [
+        "## What This Repo Is",
+        "## Hard Rules",
+        "## High-Risk Areas",
+        "## Read Next"
+      ],
+      "requiredSnippets": [
+        ".oslite/docs/agents/authoring/fill-project-docs.md",
+        ".oslite/docs/agents/authoring/evidence-map.md",
+        "Assets/_GameCenter/ClientLua/Main.lua"
+      ]
+    },
+    {
+      "path": "CLAUDE.md",
+      "requiredHeadings": [
+        "## Shared Instructions Import",
+        "## Claude Code Notes"
+      ],
+      "requiredSnippets": [
+        "@AGENTS.md",
+        "@.oslite/docs/agents/authoring/fill-project-docs.md",
+        "@.oslite/docs/agents/authoring/evidence-map.md"
+      ]
+    },
+    {
+      "path": ".oslite/docs/project/overview.md",
+      "requiredHeadings": [
+        "## What This Project Is",
+        "## Core Areas",
+        "## Main Flow",
+        "## First Read Recommendation"
+      ],
+      "evidenceSections": [
+        "What This Project Is",
+        "Core Areas",
+        "Main Flow",
+        "First Read Recommendation"
+      ]
+    },
+    {
+      "path": ".oslite/docs/project/architecture.md",
+      "requiredHeadings": [
+        "## Host Startup Chain",
+        "## Lua Init And Hall Entry Chain",
+        "## Hall Runtime Chain",
+        "## Enter Subgame And Return To Hall Chain",
+        "## Layers And Boundaries"
+      ],
+      "evidenceSections": [
+        "Host Startup Chain",
+        "Lua Init And Hall Entry Chain",
+        "Hall Runtime Chain",
+        "Enter Subgame And Return To Hall Chain",
+        "Layers And Boundaries"
+      ]
+    },
+    {
+      "path": ".oslite/docs/project/repo-map.md",
+      "requiredHeadings": [
+        "## Main Code Directories",
+        "## Responsibility Guide",
+        "## Change Navigation",
+        "## Non-Core Areas"
+      ],
+      "evidenceSections": [
+        "Main Code Directories",
+        "Responsibility Guide",
+        "Change Navigation",
+        "Non-Core Areas"
+      ]
+    },
+    {
+      "path": ".oslite/docs/project/entrypoints.md",
+      "requiredHeadings": [
+        "## Host Startup Entry",
+        "## Lua Startup Entry",
+        "## Hall Main Flow Entry",
+        "## Network Entry",
+        "## Resource And Hot-Update Entry",
+        "## Enter Subgame And Return To Hall Entry"
+      ],
+      "evidenceSections": [
+        "Host Startup Entry",
+        "Lua Startup Entry",
+        "Hall Main Flow Entry",
+        "Network Entry",
+        "Resource And Hot-Update Entry",
+        "Enter Subgame And Return To Hall Entry"
+      ],
+      "sectionRules": [
+        {
+          "heading": "Host Startup Entry",
+          "requiredSnippets": [
+            "Assets/_GameCenter/FrameWork/Behaviours/Launch.cs",
+            "Assets/_GameCenter/ClientLua/Main.lua"
+          ]
+        },
+        {
+          "heading": "Resource And Hot-Update Entry",
+          "requiredSnippets": [
+            "Assets/_GameCenter/ClientLua/Model/ResDownload/ResDownloadManager.lua"
+          ]
+        }
+      ]
+    },
+    {
+      "path": ".oslite/docs/project/glossary.md",
+      "requiredHeadings": [
+        "## Business Terms",
+        "## Engineering Terms",
+        "## Framework Terms",
+        "## Unconfirmed Terms"
+      ],
+      "evidenceSections": [
+        "Business Terms",
+        "Engineering Terms",
+        "Framework Terms",
+        "Unconfirmed Terms"
+      ]
+    },
+    {
+      "path": ".oslite/docs/project/coding-rules.md",
+      "requiredHeadings": [
+        "## Naming And Annotation",
+        "## Module Wiring And Require Conventions",
+        "## View And Controller Boundaries",
+        "## Lifecycle And Notification Cleanup",
+        "## Resource, Hot-Update, And Scene Risk",
+        "## Common Review Traps"
+      ],
+      "evidenceSections": [
+        "Naming And Annotation",
+        "Module Wiring And Require Conventions",
+        "View And Controller Boundaries",
+        "Lifecycle And Notification Cleanup",
+        "Resource, Hot-Update, And Scene Risk",
+        "Common Review Traps"
+      ]
+    },
+    {
+      "path": ".oslite/docs/agents/quickstart.md",
+      "requiredHeadings": [
+        "## Suggested Read Order",
+        "## Suggested Search Keywords",
+        "## Review Priorities",
+        "## Time Sinks To Avoid"
+      ],
+      "requiredSnippets": [
+        "Assets/_GameCenter/ClientLua/Main.lua",
+        "ResDownloadManager",
+        "EmmyLua"
+      ]
+    },
+    {
+      "path": ".oslite/docs/agents/change-playbook.md",
+      "requiredHeadings": [
+        "## Before You Start",
+        "## When You Must Update Docs",
+        "## When Not To Expand Core Project Docs",
+        "## Final Checks"
+      ],
+      "requiredSnippets": [
+        "oslite docs verify .",
+        "evidence-map.md",
+        "ViewManager.lua",
+        "Network.lua"
+      ]
+    },
+    {
+      "path": ".oslite/docs/agents/authoring/doc-contract.md",
+      "requiredHeadings": [
+        "## Goal",
+        "## Doc Scope",
+        "## Working Method",
+        "## Key Writing Rules",
+        "## Exclusions"
+      ],
+      "requiredSnippets": [
+        "Assets/_GameCenter/ClientLua/Main.lua",
+        "Inferred",
+        "Pending"
+      ],
+      "skipPlaceholderCheck": true
+    },
+    {
+      "path": ".oslite/docs/agents/authoring/project-brief.md",
+      "requiredHeadings": [
+        "## Basics",
+        "## Candidate Core Directories",
+        "## Explicitly Excluded Directories",
+        "## Known Entry Hints",
+        "## Other Repo-Specific Hints"
+      ],
+      "requiredSnippets": [
+        "Assets/_GameCenter/ClientLua/Main.lua"
+      ],
+      "skipPlaceholderCheck": true
+    },
+    {
+      "path": ".oslite/docs/agents/authoring/repo-reading-checklist.md",
+      "requiredHeadings": [
+        "## Top-Level Structure",
+        "## Startup And Flow",
+        "## Resources And Network",
+        "## Lifecycle",
+        "## Boundaries And Stack"
+      ],
+      "requiredSnippets": [
+        "Assets/_GameCenter/ClientLua/Main.lua",
+        "Unity",
+        "ToLua"
+      ],
+      "skipPlaceholderCheck": true
+    },
+    {
+      "path": ".oslite/docs/agents/authoring/evidence-map.md",
+      "requiredHeadings": [
+        "## Core Area Decision",
+        "## Host Startup Chain",
+        "## Lua Init And Hall Entry Chain",
+        "## Hall Flow And View Switching",
+        "## Network Entry",
+        "## Resource And Hot-Update Entry",
+        "## Enter Subgame And Return To Hall",
+        "## External Boundaries And Plugins",
+        "## Stack Signals"
+      ],
+      "evidenceSections": [
+        "Core Area Decision",
+        "Host Startup Chain",
+        "Lua Init And Hall Entry Chain",
+        "Hall Flow And View Switching",
+        "Network Entry",
+        "Resource And Hot-Update Entry",
+        "Enter Subgame And Return To Hall",
+        "External Boundaries And Plugins",
+        "Stack Signals"
+      ],
+      "sectionRules": [
+        {
+          "heading": "Host Startup Chain",
+          "requiredSnippets": [
+            "Assets/_GameCenter/FrameWork/Behaviours/Launch.cs",
+            "Assets/_GameCenter/ClientLua/Main.lua"
+          ]
+        },
+        {
+          "heading": "Network Entry",
+          "requiredSnippets": [
+            "Assets/_GameCenter/ClientLua/Model/Network/Network.lua"
+          ]
+        },
+        {
+          "heading": "Resource And Hot-Update Entry",
+          "requiredSnippets": [
+            "Assets/_GameCenter/ClientLua/Model/ResDownload/ResDownloadManager.lua"
+          ]
+        }
+      ]
+    }
+  ]
+}
